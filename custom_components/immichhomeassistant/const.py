@@ -1,4 +1,3 @@
-
 DOMAIN = "immichhomeassistant"
 CONF_WATCHED_ALBUMS = "watched_albums"
 CONF_REFRESH_INTERVAL = "refresh_interval"

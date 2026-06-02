@@ -1,7 +1,8 @@
-
 from __future__ import annotations
+
 import logging
 from urllib.parse import urljoin
+
 from aiohttp import ClientError
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
@@ -48,8 +49,8 @@ class ImmichHomeAssistantHub:
             async with self._session.post(url, headers=self._headers) as response:
                 if response.status != 200:
                     return False
-                auth_result = await response.json()
-                return bool(auth_result.get("authStatus"))
+                data = await response.json()
+                return bool(data.get("authStatus"))
         except ClientError as exception:
             raise CannotConnect from exception
 
@@ -59,7 +60,7 @@ class ImmichHomeAssistantHub:
             raise ApiError("Unexpected response")
         return result
 
-    async def get_asset_info(self, asset_id: str) -> dict | None:
+    async def get_asset_info(self, asset_id: str) -> dict:
         result = await self._get_json(f"/api/assets/{asset_id}")
         if not isinstance(result, dict):
             raise ApiError("Unexpected response")
@@ -81,7 +82,7 @@ class ImmichHomeAssistantHub:
             return None
 
     async def download_asset_thumbnail(self, asset_id: str) -> bytes | None:
-        return await self._download_binary(f"api/assets/{asset_id}/thumbnail", params={"edited":"true"})
+        return await self._download_binary(f"api/assets/{asset_id}/thumbnail", {"edited": "true"})
 
     async def download_asset(self, asset_id: str) -> bytes | None:
         return await self._download_binary(f"api/assets/{asset_id}/original")
@@ -90,8 +91,8 @@ class ImmichHomeAssistantHub:
         result = await self._post_json("/api/search/metadata", {"isFavorite": "true"})
         if not isinstance(result, dict):
             raise ApiError("Unexpected response")
-        assets = result.get("assets", {}).get("items", [])
-        return [asset for asset in assets if asset.get("type") == "IMAGE"]
+        items = result.get("assets", {}).get("items", [])
+        return [asset for asset in items if asset.get("type") == "IMAGE"]
 
     async def list_all_albums(self) -> list[dict]:
         result = await self._get_json("/api/albums")
@@ -103,12 +104,14 @@ class ImmichHomeAssistantHub:
         result = await self._get_json(f"/api/albums/{album_id}")
         if not isinstance(result, dict):
             raise ApiError("Unexpected response")
-        assets = result.get("assets", [])
-        return [asset for asset in assets if asset.get("type") == "IMAGE"]
+        items = result.get("assets", [])
+        return [asset for asset in items if asset.get("type") == "IMAGE"]
 
 class CannotConnect(HomeAssistantError):
     pass
+
 class InvalidAuth(HomeAssistantError):
     pass
+
 class ApiError(HomeAssistantError):
     pass
