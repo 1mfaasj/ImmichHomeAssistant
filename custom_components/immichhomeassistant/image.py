@@ -19,10 +19,11 @@ async def async_setup_entry(
     config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up image entity."""
+    """Set up ImmichHomeAssistant image entities."""
     hub: ImmichHomeAssistantHub = hass.data[DOMAIN][config_entry.entry_id]
 
     entities = [ImmichImage(hass, hub)]
+
     hass.data.setdefault(f"{DOMAIN}_entities", {})
     hass.data[f"{DOMAIN}_entities"][config_entry.entry_id] = entities
 
@@ -38,8 +39,8 @@ class ImmichImage(ImageEntity):
     _attr_content_type = "image/jpeg"
 
     def __init__(self, hass: HomeAssistant, hub: ImmichHomeAssistantHub) -> None:
-        """Initialize image entity."""
-        # DIT IS DE BELANGRIJKE FIX:
+        """Initialize the image entity."""
+        # BELANGRIJK: zonder deze init ontbreekt access_tokens
         ImageEntity.__init__(self, hass)
 
         self.hub = hub
@@ -51,7 +52,7 @@ class ImmichImage(ImageEntity):
         await self._update_image()
 
     async def _update_image(self) -> None:
-        """Fetch image."""
+        """Fetch image from Immich."""
         try:
             assets = await self.hub.list_favorite_images()
 
@@ -73,29 +74,29 @@ class ImmichImage(ImageEntity):
                 return
 
             self._image = image
+
+            # Home Assistant gebruikt image_last_updated om opnieuw te fetchen
             self._attr_image_last_updated = datetime.now(UTC)
+
             self.async_write_ha_state()
 
         except Exception as err:
             _LOGGER.exception("Image update failed: %s", err)
 
     async def async_force_next_image(self) -> None:
-        """Service helper: load next image."""
+        """Service helper for next_image."""
         await self._update_image()
 
     async def async_set_shuffle_mode(self, enabled: bool) -> None:
         """Compatibility stub for service handler."""
-        # In deze minimale versie nog geen shuffle-logica
         self.async_write_ha_state()
 
     async def async_set_random_speed(self, enabled: bool) -> None:
         """Compatibility stub for service handler."""
-        # In deze minimale versie nog geen random-speed logica
         self.async_write_ha_state()
 
     async def async_set_refresh_interval(self, seconds: int) -> None:
         """Compatibility stub for service handler."""
-        # In deze minimale versie nog geen timer-logica
         self.async_write_ha_state()
 
     async def async_image(self) -> bytes | None:
