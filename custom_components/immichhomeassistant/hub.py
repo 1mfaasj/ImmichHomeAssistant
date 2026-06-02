@@ -116,12 +116,10 @@ class ImmichHomeAssistantHub:
 
 
 class CannotConnect(HomeAssistantError):
-    """Error to indicate we cannot connect."""
-
+    pass
 
 class InvalidAuth(HomeAssistantError):
-    """Error to indicate there is invalid auth."""
-
+    pass
 
 class ApiError(HomeAssistantError):
-    """Error to indicate the API returned an error."""
+    pass

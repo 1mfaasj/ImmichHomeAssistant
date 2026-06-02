@@ -62,50 +62,29 @@ async def async_setup_entry(
                     )
                 )
 
-    entry_data["entities"] = entities
+    hass.data.setdefault(f"{DOMAIN}_entities", {})
+    hass.data[f"{DOMAIN}_entities"][config_entry.entry_id] = entities
     async_add_entities(entities)
 
 
 class BaseImmichHomeAssistantImage(ImageEntity):
-    """Base image entity for ImmichHomeAssistant."""
-
     _attr_should_poll = False
     _attr_content_type = "image/jpeg"
 
-    def __init__(
-        self,
-        hass: HomeAssistant,
-        config_entry: ConfigEntry,
-        hub: ImmichHomeAssistantHub,
-        name: str,
-        unique_id: str,
-    ) -> None:
-        """Initialize the entity."""
+    def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry, hub: ImmichHomeAssistantHub, name: str, unique_id: str) -> None:
         ImageEntity.__init__(self, hass)
-
         self.hass = hass
         self.config_entry = config_entry
         self.hub = hub
-
         self._attr_name = name
         self._attr_unique_id = unique_id
         self._attr_image_last_updated = None
 
-        self._refresh_interval = int(
-            config_entry.options.get(CONF_REFRESH_INTERVAL, DEFAULT_REFRESH_INTERVAL)
-        )
-        self._no_repeat_window = int(
-            config_entry.options.get(CONF_NO_REPEAT_WINDOW, DEFAULT_NO_REPEAT_WINDOW)
-        )
-        self._tag_filter = self._parse_tag_filter(
-            config_entry.options.get(CONF_TAG_FILTER, DEFAULT_TAG_FILTER)
-        )
-        self._shuffle_mode = bool(
-            config_entry.options.get(CONF_SHUFFLE_MODE, DEFAULT_SHUFFLE_MODE)
-        )
-        self._random_speed = bool(
-            config_entry.options.get(CONF_RANDOM_SPEED, DEFAULT_RANDOM_SPEED)
-        )
+        self._refresh_interval = int(config_entry.options.get(CONF_REFRESH_INTERVAL, DEFAULT_REFRESH_INTERVAL))
+        self._no_repeat_window = int(config_entry.options.get(CONF_NO_REPEAT_WINDOW, DEFAULT_NO_REPEAT_WINDOW))
+        self._tag_filter = self._parse_tag_filter(config_entry.options.get(CONF_TAG_FILTER, DEFAULT_TAG_FILTER))
+        self._shuffle_mode = bool(config_entry.options.get(CONF_SHUFFLE_MODE, DEFAULT_SHUFFLE_MODE))
+        self._random_speed = bool(config_entry.options.get(CONF_RANDOM_SPEED, DEFAULT_RANDOM_SPEED))
 
         self._current_asset_id: str | None = None
         self._current_image_bytes: bytes | None = None
@@ -118,31 +97,26 @@ class BaseImmichHomeAssistantImage(ImageEntity):
 
     @staticmethod
     def _parse_tag_filter(value: str | None) -> set[str]:
-        """Parse comma-separated tag filter."""
         if not value:
             return set()
         return {item.strip().lower() for item in value.split(",") if item.strip()}
 
     async def async_added_to_hass(self) -> None:
-        """Handle entity added to HA."""
         await self._async_refresh(force_asset_list=True)
         self._schedule_next_refresh()
 
     async def async_will_remove_from_hass(self) -> None:
-        """Handle entity removal."""
         if self._unsub_refresh:
             self._unsub_refresh()
             self._unsub_refresh = None
 
     def _schedule_next_refresh(self) -> None:
-        """Schedule the next refresh."""
         if self._unsub_refresh:
             self._unsub_refresh()
         delay = self._next_delay_seconds()
         self._unsub_refresh = async_call_later(self.hass, delay, self._handle_refresh)
 
     def _next_delay_seconds(self) -> int:
-        """Return next refresh delay."""
         base = max(10, self._refresh_interval)
         if not self._random_speed:
             return base
@@ -151,16 +125,13 @@ class BaseImmichHomeAssistantImage(ImageEntity):
         return random.randint(low, high)
 
     async def _handle_refresh(self, _now) -> None:
-        """Handle scheduled refresh."""
         await self._async_refresh()
         self._schedule_next_refresh()
 
     async def _async_get_asset_list(self) -> list[dict]:
-        """Get asset list."""
         raise NotImplementedError
 
     async def _ensure_asset_list(self, force: bool = False) -> None:
-        """Refresh asset list if needed."""
         now = datetime.now(UTC)
         should_refresh = force
         if self._last_asset_ids_refresh is None:
@@ -177,10 +148,8 @@ class BaseImmichHomeAssistantImage(ImageEntity):
         self._asset_list = assets
         self._shuffle_queue = []
         self._last_asset_ids_refresh = now
-        _LOGGER.debug("Prepared %d assets for %s", len(self._asset_list), self.name)
 
     async def _apply_tag_filter(self, assets: list[dict]) -> list[dict]:
-        """Apply optional tag filter."""
         if not self._tag_filter:
             return assets
 
@@ -216,17 +185,13 @@ class BaseImmichHomeAssistantImage(ImageEntity):
         return filtered
 
     def _next_asset_from_shuffle(self) -> dict | None:
-        """Select the next asset in shuffle mode."""
         while self._shuffle_queue:
             asset = self._shuffle_queue.pop(0)
             asset_id = asset.get("id")
             if asset_id != self._current_asset_id and asset_id not in self._recent_asset_ids:
                 return asset
 
-        candidates = [
-            asset for asset in self._asset_list
-            if asset.get("id") != self._current_asset_id and asset.get("id") not in self._recent_asset_ids
-        ]
+        candidates = [asset for asset in self._asset_list if asset.get("id") != self._current_asset_id and asset.get("id") not in self._recent_asset_ids]
         if not candidates:
             candidates = [asset for asset in self._asset_list if asset.get("id") != self._current_asset_id]
         if not candidates:
@@ -236,16 +201,12 @@ class BaseImmichHomeAssistantImage(ImageEntity):
         return self._shuffle_queue.pop(0) if self._shuffle_queue else None
 
     def _select_next_asset(self) -> dict | None:
-        """Select the next asset."""
         if not self._asset_list:
             return None
         if self._shuffle_mode:
             return self._next_asset_from_shuffle()
 
-        candidates = [
-            asset for asset in self._asset_list
-            if asset.get("id") != self._current_asset_id and asset.get("id") not in self._recent_asset_ids
-        ]
+        candidates = [asset for asset in self._asset_list if asset.get("id") != self._current_asset_id and asset.get("id") not in self._recent_asset_ids]
         if not candidates:
             candidates = [asset for asset in self._asset_list if asset.get("id") != self._current_asset_id]
         if not candidates:
@@ -253,7 +214,6 @@ class BaseImmichHomeAssistantImage(ImageEntity):
         return random.choice(candidates)
 
     async def _async_refresh(self, force_asset_list: bool = False) -> None:
-        """Refresh the displayed image."""
         try:
             await self._ensure_asset_list(force=force_asset_list)
             if not self._asset_list:
@@ -285,35 +245,29 @@ class BaseImmichHomeAssistantImage(ImageEntity):
             _LOGGER.exception("Failed refreshing %s: %s", self.name, err)
 
     async def async_force_next_image(self) -> None:
-        """Force the next image immediately."""
         await self._async_refresh()
         self._schedule_next_refresh()
 
     async def async_set_shuffle_mode(self, enabled: bool) -> None:
-        """Set shuffle mode at runtime."""
         self._shuffle_mode = bool(enabled)
         self._shuffle_queue = []
         self.async_write_ha_state()
 
     async def async_set_random_speed(self, enabled: bool) -> None:
-        """Set random-speed mode at runtime."""
         self._random_speed = bool(enabled)
         self._schedule_next_refresh()
         self.async_write_ha_state()
 
     async def async_set_refresh_interval(self, seconds: int) -> None:
-        """Set refresh interval at runtime."""
         self._refresh_interval = int(seconds)
         self._schedule_next_refresh()
         self.async_write_ha_state()
 
     async def async_image(self) -> bytes | None:
-        """Return image bytes."""
         return self._current_image_bytes
 
     @property
     def extra_state_attributes(self) -> dict:
-        """Return extra state attributes."""
         return {
             "refresh_interval": self._refresh_interval,
             "no_repeat_window": self._no_repeat_window,
@@ -327,38 +281,20 @@ class BaseImmichHomeAssistantImage(ImageEntity):
 
 
 class ImmichHomeAssistantImageFavorite(BaseImmichHomeAssistantImage):
-    """Random image from favorites."""
-
     def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry, hub: ImmichHomeAssistantHub) -> None:
-        super().__init__(
-            hass=hass,
-            config_entry=config_entry,
-            hub=hub,
-            name="ImmichHomeAssistant favorite image",
-            unique_id=f"{config_entry.entry_id}_favorite_image",
-        )
+        super().__init__(hass, config_entry, hub, "ImmichHomeAssistant favorite image", f"{config_entry.entry_id}_favorite_image")
 
     async def _async_get_asset_list(self) -> list[dict]:
-        """Return favorite images."""
         return await self.hub.list_favorite_images()
 
 
 class ImmichHomeAssistantImageAlbum(BaseImmichHomeAssistantImage):
-    """Random image from a specific album."""
-
     def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry, hub: ImmichHomeAssistantHub, album_id: str, album_name: str) -> None:
         self.album_id = album_id
         self.album_name = album_name
-        super().__init__(
-            hass=hass,
-            config_entry=config_entry,
-            hub=hub,
-            name=f"ImmichHomeAssistant {album_name}",
-            unique_id=f"{config_entry.entry_id}_album_{album_id}",
-        )
+        super().__init__(hass, config_entry, hub, f"ImmichHomeAssistant {album_name}", f"{config_entry.entry_id}_album_{album_id}")
 
     async def _async_get_asset_list(self) -> list[dict]:
-        """Return album images."""
         return await self.hub.list_album_images(self.album_id)
 
     @property
