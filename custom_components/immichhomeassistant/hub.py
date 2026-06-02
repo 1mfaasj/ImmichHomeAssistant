@@ -2,6 +2,7 @@
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from urllib.parse import urljoin
 from aiohttp import ClientError
+from homeassistant.exceptions import HomeAssistantError
 
 class ImmichHomeAssistantHub:
     def __init__(self, hass, host, api_key):
@@ -29,3 +30,14 @@ class ImmichHomeAssistantHub:
                 return None
         except ClientError:
             return None
+
+class CannotConnect(HomeAssistantError):
+    pass
+
+
+class InvalidAuth(HomeAssistantError):
+    pass
+
+
+class ApiError(HomeAssistantError):
+    pass
