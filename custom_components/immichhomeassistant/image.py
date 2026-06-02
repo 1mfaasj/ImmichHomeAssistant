@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from collections import deque
 from datetime import datetime, UTC
 import logging
+import secrets
 
 from homeassistant.components.image import ImageEntity
 from homeassistant.config_entries import ConfigEntry
@@ -31,7 +33,7 @@ async def async_setup_entry(
 
 
 class ImmichImage(ImageEntity):
-    """Basic Immich image entity."""
+    """Immich image entity."""
 
     _attr_name = "Immich Favorite"
     _attr_unique_id = "immichhomeassistant_favorite_image"
@@ -39,13 +41,20 @@ class ImmichImage(ImageEntity):
     _attr_content_type = "image/jpeg"
 
     def __init__(self, hass: HomeAssistant, hub: ImmichHomeAssistantHub) -> None:
-        """Initialize the image entity."""
-        # BELANGRIJK: zonder deze init ontbreekt access_tokens
+        """Initialize image entity."""
+        # Home Assistant ImageEntity basis initialiseren
         ImageEntity.__init__(self, hass)
 
         self.hub = hub
         self._image: bytes | None = None
         self._attr_image_last_updated = None
+
+        # Belangrijk: expliciet access_tokens aanwezig maken
+        self.access_tokens = deque([secrets.token_hex(32)], maxlen=2)
+
+    def async_update_token(self) -> None:
+        """Update access token for the image endpoint."""
+        self.access_tokens.append(secrets.token_hex(32))
 
     async def async_added_to_hass(self) -> None:
         """Load first image when entity is added."""
@@ -65,7 +74,7 @@ class ImmichImage(ImageEntity):
             # Eerst thumbnail endpoint
             image = await self.hub.download_asset_thumbnail(asset_id)
 
-            # Fallback naar origineel
+            # Fallback naar originele asset
             if not image:
                 image = await self.hub.download_asset(asset_id)
 
@@ -75,7 +84,8 @@ class ImmichImage(ImageEntity):
 
             self._image = image
 
-            # Home Assistant gebruikt image_last_updated om opnieuw te fetchen
+            # Nieuwe token en nieuwe timestamp zodat frontend opnieuw ophaalt
+            self.async_update_token()
             self._attr_image_last_updated = datetime.now(UTC)
 
             self.async_write_ha_state()
@@ -88,15 +98,15 @@ class ImmichImage(ImageEntity):
         await self._update_image()
 
     async def async_set_shuffle_mode(self, enabled: bool) -> None:
-        """Compatibility stub for service handler."""
+        """Compatibility stub for current service handler."""
         self.async_write_ha_state()
 
     async def async_set_random_speed(self, enabled: bool) -> None:
-        """Compatibility stub for service handler."""
+        """Compatibility stub for current service handler."""
         self.async_write_ha_state()
 
     async def async_set_refresh_interval(self, seconds: int) -> None:
-        """Compatibility stub for service handler."""
+        """Compatibility stub for current service handler."""
         self.async_write_ha_state()
 
     async def async_image(self) -> bytes | None:
