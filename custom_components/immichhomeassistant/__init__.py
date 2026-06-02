@@ -4,9 +4,8 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 import voluptuous as vol
-
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_API_KEY, CONF_HOST, ATTR_ENTITY_ID, Platform
+from homeassistant.const import ATTR_ENTITY_ID, CONF_API_KEY, CONF_HOST, Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 import homeassistant.helpers.config_validation as cv
 
@@ -22,34 +21,26 @@ SERVICE_SET_REFRESH_INTERVAL = "set_refresh_interval"
 ATTR_ENABLED = "enabled"
 ATTR_SECONDS = "seconds"
 
-SERVICE_ENTITY_SCHEMA = vol.Schema(
-    {
-        vol.Optional(ATTR_ENTITY_ID): vol.Any(cv.entity_id, [cv.entity_id]),
-    }
-)
-
-SERVICE_ENABLED_SCHEMA = SERVICE_ENTITY_SCHEMA.extend(
-    {
-        vol.Required(ATTR_ENABLED): bool,
-    }
-)
-
-SERVICE_INTERVAL_SCHEMA = SERVICE_ENTITY_SCHEMA.extend(
-    {
-        vol.Required(ATTR_SECONDS): vol.All(vol.Coerce(int), vol.Range(min=10, max=3600)),
-    }
-)
+SERVICE_ENTITY_SCHEMA = vol.Schema({
+    vol.Optional(ATTR_ENTITY_ID): vol.Any(cv.entity_id, [cv.entity_id]),
+})
+SERVICE_ENABLED_SCHEMA = SERVICE_ENTITY_SCHEMA.extend({
+    vol.Required(ATTR_ENABLED): bool,
+})
+SERVICE_INTERVAL_SCHEMA = SERVICE_ENTITY_SCHEMA.extend({
+    vol.Required(ATTR_SECONDS): vol.All(vol.Coerce(int), vol.Range(min=10, max=3600)),
+})
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up services for ImmichHomeAssistant."""
     hass.data.setdefault(DOMAIN, {})
+    hass.data.setdefault(f"{DOMAIN}_entities", {})
 
     def _iter_entities() -> Iterable:
-        for entry_data in hass.data.get(DOMAIN, {}).values():
-            if isinstance(entry_data, dict):
-                for entity in entry_data.get("entities", []):
-                    yield entity
+        for entity_list in hass.data.get(f"{DOMAIN}_entities", {}).values():
+            for entity in entity_list:
+                yield entity
 
     def _target_entities(call: ServiceCall):
         requested = call.data.get(ATTR_ENTITY_ID)
@@ -95,6 +86,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up ImmichHomeAssistant from a config entry."""
     hass.data.setdefault(DOMAIN, {})
+    hass.data.setdefault(f"{DOMAIN}_entities", {})
 
     hub = ImmichHomeAssistantHub(
         hass=hass,
@@ -105,7 +97,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if not await hub.authenticate():
         raise InvalidAuth
 
-    hass.data[DOMAIN][entry.entry_id] = {"hub": hub, "entities": []}
+    hass.data[DOMAIN][entry.entry_id] = hub
+    hass.data[f"{DOMAIN}_entities"][entry.entry_id] = []
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
@@ -115,4 +108,5 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
         hass.data[DOMAIN].pop(entry.entry_id, None)
+        hass.data.get(f"{DOMAIN}_entities", {}).pop(entry.entry_id, None)
     return unload_ok
