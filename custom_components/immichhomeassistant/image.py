@@ -38,10 +38,9 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up ImmichHomeAssistant image entities."""
-    hub: ImmichHomeAssistantHub = hass.data[DOMAIN][config_entry.entry_id]
-    entities: list[ImageEntity] = [
-        ImmichHomeAssistantImageFavorite(hass, config_entry, hub)
-    ]
+    entry_data = hass.data[DOMAIN][config_entry.entry_id]
+    hub: ImmichHomeAssistantHub = entry_data["hub"]
+    entities: list[ImageEntity] = [ImmichHomeAssistantImageFavorite(hass, config_entry, hub)]
 
     watched_album_ids = config_entry.options.get(CONF_WATCHED_ALBUMS, [])
     if watched_album_ids:
@@ -64,6 +63,7 @@ async def async_setup_entry(
                     )
                 )
 
+    entry_data["entities"] = entities
     async_add_entities(entities)
 
 
@@ -112,9 +112,7 @@ class BaseImmichHomeAssistantImage(ImageEntity):
         self._current_image_bytes: bytes | None = None
         self._last_asset_ids_refresh: datetime | None = None
         self._asset_list: list[dict] = []
-        self._recent_asset_ids: deque[str] = deque(
-            maxlen=max(self._no_repeat_window, 1)
-        )
+        self._recent_asset_ids: deque[str] = deque(maxlen=max(self._no_repeat_window, 1))
         self._refresh_counter = 0
         self._unsub_refresh = None
         self._shuffle_queue: list[dict] = []
@@ -141,17 +139,14 @@ class BaseImmichHomeAssistantImage(ImageEntity):
         """Schedule the next refresh."""
         if self._unsub_refresh:
             self._unsub_refresh()
-
         delay = self._next_delay_seconds()
         self._unsub_refresh = async_call_later(self.hass, delay, self._handle_refresh)
 
     def _next_delay_seconds(self) -> int:
         """Return next refresh delay."""
         base = max(10, self._refresh_interval)
-
         if not self._random_speed:
             return base
-
         low = max(10, int(base * 0.5))
         high = max(low, int(base * 1.5))
         return random.randint(low, high)
@@ -169,24 +164,20 @@ class BaseImmichHomeAssistantImage(ImageEntity):
         """Refresh asset list if needed."""
         now = datetime.now(UTC)
         should_refresh = force
-
         if self._last_asset_ids_refresh is None:
             should_refresh = True
         else:
             age_seconds = (now - self._last_asset_ids_refresh).total_seconds()
             if age_seconds >= ID_LIST_REFRESH_INTERVAL_SECONDS:
                 should_refresh = True
-
         if not should_refresh:
             return
 
         assets = await self._async_get_asset_list()
         assets = await self._apply_tag_filter(assets)
-
         self._asset_list = assets
         self._shuffle_queue = []
         self._last_asset_ids_refresh = now
-
         _LOGGER.debug("Prepared %d assets for %s", len(self._asset_list), self.name)
 
     async def _apply_tag_filter(self, assets: list[dict]) -> list[dict]:
@@ -195,10 +186,8 @@ class BaseImmichHomeAssistantImage(ImageEntity):
             return assets
 
         filtered: list[dict] = []
-
         for asset in assets:
             tag_names = set()
-
             raw_tags = asset.get("tags") or []
             if isinstance(raw_tags, list):
                 for tag in raw_tags:
@@ -214,7 +203,6 @@ class BaseImmichHomeAssistantImage(ImageEntity):
                     asset_info = await self.hub.get_asset_info(asset["id"])
                 except Exception:
                     asset_info = None
-
                 if isinstance(asset_info, dict):
                     for tag in asset_info.get("tags", []):
                         if isinstance(tag, dict):
@@ -226,7 +214,6 @@ class BaseImmichHomeAssistantImage(ImageEntity):
 
             if self._tag_filter.intersection(tag_names):
                 filtered.append(asset)
-
         return filtered
 
     def _next_asset_from_shuffle(self) -> dict | None:
@@ -234,66 +221,42 @@ class BaseImmichHomeAssistantImage(ImageEntity):
         while self._shuffle_queue:
             asset = self._shuffle_queue.pop(0)
             asset_id = asset.get("id")
-            if (
-                asset_id != self._current_asset_id
-                and asset_id not in self._recent_asset_ids
-            ):
+            if asset_id != self._current_asset_id and asset_id not in self._recent_asset_ids:
                 return asset
 
         candidates = [
-            asset
-            for asset in self._asset_list
-            if asset.get("id") != self._current_asset_id
-            and asset.get("id") not in self._recent_asset_ids
+            asset for asset in self._asset_list
+            if asset.get("id") != self._current_asset_id and asset.get("id") not in self._recent_asset_ids
         ]
-
         if not candidates:
-            candidates = [
-                asset
-                for asset in self._asset_list
-                if asset.get("id") != self._current_asset_id
-            ]
-
+            candidates = [asset for asset in self._asset_list if asset.get("id") != self._current_asset_id]
         if not candidates:
             candidates = self._asset_list[:]
-
         self._shuffle_queue = candidates[:]
         random.shuffle(self._shuffle_queue)
-
         return self._shuffle_queue.pop(0) if self._shuffle_queue else None
 
     def _select_next_asset(self) -> dict | None:
         """Select the next asset."""
         if not self._asset_list:
             return None
-
         if self._shuffle_mode:
             return self._next_asset_from_shuffle()
 
         candidates = [
-            asset
-            for asset in self._asset_list
-            if asset.get("id") != self._current_asset_id
-            and asset.get("id") not in self._recent_asset_ids
+            asset for asset in self._asset_list
+            if asset.get("id") != self._current_asset_id and asset.get("id") not in self._recent_asset_ids
         ]
-
         if not candidates:
-            candidates = [
-                asset
-                for asset in self._asset_list
-                if asset.get("id") != self._current_asset_id
-            ]
-
+            candidates = [asset for asset in self._asset_list if asset.get("id") != self._current_asset_id]
         if not candidates:
             candidates = self._asset_list
-
         return random.choice(candidates)
 
     async def _async_refresh(self, force_asset_list: bool = False) -> None:
         """Refresh the displayed image."""
         try:
             await self._ensure_asset_list(force=force_asset_list)
-
             if not self._asset_list:
                 _LOGGER.warning("No assets are available for %s", self.name)
                 return
@@ -310,9 +273,7 @@ class BaseImmichHomeAssistantImage(ImageEntity):
 
             image_bytes = await self.hub.download_asset(asset_id)
             if not image_bytes:
-                _LOGGER.warning(
-                    "Failed to download asset %s for %s", asset_id, self.name
-                )
+                _LOGGER.warning("Failed to download asset %s for %s", asset_id, self.name)
                 return
 
             self._current_asset_id = asset_id
@@ -320,11 +281,32 @@ class BaseImmichHomeAssistantImage(ImageEntity):
             self._recent_asset_ids.append(asset_id)
             self._refresh_counter += 1
             self._attr_image_last_updated = datetime.now(UTC)
-
             self.async_write_ha_state()
-
         except Exception as err:
             _LOGGER.exception("Failed refreshing %s: %s", self.name, err)
+
+    async def async_force_next_image(self) -> None:
+        """Force the next image immediately."""
+        await self._async_refresh()
+        self._schedule_next_refresh()
+
+    async def async_set_shuffle_mode(self, enabled: bool) -> None:
+        """Set shuffle mode at runtime."""
+        self._shuffle_mode = bool(enabled)
+        self._shuffle_queue = []
+        self.async_write_ha_state()
+
+    async def async_set_random_speed(self, enabled: bool) -> None:
+        """Set random-speed mode at runtime."""
+        self._random_speed = bool(enabled)
+        self._schedule_next_refresh()
+        self.async_write_ha_state()
+
+    async def async_set_refresh_interval(self, seconds: int) -> None:
+        """Set refresh interval at runtime."""
+        self._refresh_interval = int(seconds)
+        self._schedule_next_refresh()
+        self.async_write_ha_state()
 
     async def async_image(self) -> bytes | None:
         """Return image bytes."""
@@ -348,13 +330,7 @@ class BaseImmichHomeAssistantImage(ImageEntity):
 class ImmichHomeAssistantImageFavorite(BaseImmichHomeAssistantImage):
     """Random image from favorites."""
 
-    def __init__(
-        self,
-        hass: HomeAssistant,
-        config_entry: ConfigEntry,
-        hub: ImmichHomeAssistantHub,
-    ) -> None:
-        """Initialize favorite image entity."""
+    def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry, hub: ImmichHomeAssistantHub) -> None:
         super().__init__(
             hass=hass,
             config_entry=config_entry,
@@ -371,18 +347,9 @@ class ImmichHomeAssistantImageFavorite(BaseImmichHomeAssistantImage):
 class ImmichHomeAssistantImageAlbum(BaseImmichHomeAssistantImage):
     """Random image from a specific album."""
 
-    def __init__(
-        self,
-        hass: HomeAssistant,
-        config_entry: ConfigEntry,
-        hub: ImmichHomeAssistantHub,
-        album_id: str,
-        album_name: str,
-    ) -> None:
-        """Initialize album image entity."""
+    def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry, hub: ImmichHomeAssistantHub, album_id: str, album_name: str) -> None:
         self.album_id = album_id
         self.album_name = album_name
-
         super().__init__(
             hass=hass,
             config_entry=config_entry,
@@ -397,12 +364,6 @@ class ImmichHomeAssistantImageAlbum(BaseImmichHomeAssistantImage):
 
     @property
     def extra_state_attributes(self) -> dict:
-        """Return extra state attributes."""
         attrs = super().extra_state_attributes
-        attrs.update(
-            {
-                "album_id": self.album_id,
-                "album_name": self.album_name,
-            }
-        )
+        attrs.update({"album_id": self.album_id, "album_name": self.album_name})
         return attrs
