@@ -38,8 +38,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up ImmichHomeAssistant image entities."""
-    entry_data = hass.data[DOMAIN][config_entry.entry_id]
-    hub: ImmichHomeAssistantHub = entry_data["hub"]
+    hub: ImmichHomeAssistantHub = hass.data[DOMAIN][config_entry.entry_id]
     entities: list[ImageEntity] = [ImmichHomeAssistantImageFavorite(hass, config_entry, hub)]
 
     watched_album_ids = config_entry.options.get(CONF_WATCHED_ALBUMS, [])
