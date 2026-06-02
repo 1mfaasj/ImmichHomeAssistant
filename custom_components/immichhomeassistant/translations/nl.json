@@ -1,0 +1,36 @@
+{
+  "title": "ImmichHomeAssistant",
+  "config": {
+    "abort": {
+      "already_configured": "Integratie is al geconfigureerd"
+    },
+    "error": {
+      "cannot_connect": "Kan geen verbinding maken",
+      "invalid_auth": "Ongeldige authenticatie",
+      "unknown": "Onverwachte fout"
+    },
+    "step": {
+      "user": {
+        "title": "ImmichHomeAssistant",
+        "data": {
+          "api_key": "API-sleutel",
+          "host": "Host"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "watched_albums": "Albums waarvoor entiteiten worden aangemaakt",
+          "refresh_interval": "Verversinterval (seconden)",
+          "no_repeat_window": "Voorkom herhaling van de laatste X foto's",
+          "tag_filter": "Tagfilter (komma-gescheiden)",
+          "shuffle_mode": "Shuffle-modus",
+          "random_speed": "Willekeurige slideshowsnelheid"
+        }
+      }
+    }
+  }
+}

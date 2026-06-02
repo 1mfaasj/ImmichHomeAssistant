@@ -4,7 +4,7 @@
 ![HA validation](https://github.com/1mfaasj/ImmichHomeAssistant/actions/workflows/validate.yml/badge.svg)
 ![HACS](https://img.shields.io/badge/HACS-Custom-orange)
 
-A Home Assistant integration to display random photos from your Immich server.
+A Home Assistant custom integration to display random photos from your Immich server.
 
 ## ✨ Features
 
@@ -32,6 +32,8 @@ Restart Home Assistant after installation.
 
 Add the integration from **Settings → Devices & Services → Add Integration**.
 
+Search for: **ImmichHomeAssistant**
+
 You need:
 
 - Immich server URL
@@ -58,26 +60,9 @@ icon: mdi:image-frame
 subview: true
 cards:
   - type: picture-entity
-    entity: image.immich_favorite_image
+    entity: image.immichhomeassistant_favorite_image
     show_state: false
     show_name: false
     aspect_ratio: "16:9"
     fit_mode: contain
 ```
-
-## 🧪 Development tips
-
-### GitHub Actions
-
-Create `.github/workflows/validate.yml` and push to GitHub. The included workflow runs `hassfest` on every push and pull request.
-
-### Release
-
-Create a Git tag like `v1.0.0` and push it:
-
-```bash
-git tag v1.0.0
-git push origin v1.0.0
-```
-
-HACS can pick up releases automatically.
