@@ -122,7 +122,8 @@ class OptionsFlowHandler(config_entries.OptionsFlowWithReload):
             if "id" in album and "albumName" in album
         }
         current_albums_value = [
-            album for album in self.config_entry.options.get(CONF_WATCHED_ALBUMS, []) if album in album_map
+            album for album in self.config_entry.options.get(CONF_WATCHED_ALBUMS, [])
+            if album in album_map
         ]
 
         return self.async_show_form(
@@ -134,13 +135,23 @@ class OptionsFlowHandler(config_entries.OptionsFlowWithReload):
                         CONF_REFRESH_INTERVAL,
                         default=self.config_entry.options.get(CONF_REFRESH_INTERVAL, DEFAULT_REFRESH_INTERVAL),
                     ): NumberSelector(
-                        NumberSelectorConfig(min=MIN_REFRESH_INTERVAL, max=MAX_REFRESH_INTERVAL, step=1, mode=NumberSelectorMode.BOX)
+                        NumberSelectorConfig(
+                            min=MIN_REFRESH_INTERVAL,
+                            max=MAX_REFRESH_INTERVAL,
+                            step=1,
+                            mode=NumberSelectorMode.BOX,
+                        )
                     ),
                     vol.Required(
                         CONF_NO_REPEAT_WINDOW,
                         default=self.config_entry.options.get(CONF_NO_REPEAT_WINDOW, DEFAULT_NO_REPEAT_WINDOW),
                     ): NumberSelector(
-                        NumberSelectorConfig(min=MIN_NO_REPEAT_WINDOW, max=MAX_NO_REPEAT_WINDOW, step=1, mode=NumberSelectorMode.BOX)
+                        NumberSelectorConfig(
+                            min=MIN_NO_REPEAT_WINDOW,
+                            max=MAX_NO_REPEAT_WINDOW,
+                            step=1,
+                            mode=NumberSelectorMode.BOX,
+                        )
                     ),
                     vol.Optional(
                         CONF_TAG_FILTER,

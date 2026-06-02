@@ -124,4 +124,4 @@ class InvalidAuth(HomeAssistantError):
 
 
 class ApiError(HomeAssistantError):
-    """Error to indicate that the API returned an error."""
+    """Error to indicate the API returned an error."""
