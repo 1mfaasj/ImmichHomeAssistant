@@ -1,9 +1,5 @@
 # 📸 ImmichHomeAssistant
 
-![GitHub release](https://img.shields.io/github/v/release/1mfaasj/ImmichHomeAssistant)
-![HA validation](https://github.com/1mfaasj/ImmichHomeAssistant/actions/workflows/validate.yml/badge.svg)
-![HACS](https://img.shields.io/badge/HACS-Custom-orange)
-
 A Home Assistant custom integration to display random photos from your Immich server.
 
 ## Features
