@@ -36,7 +36,9 @@ class ImmichHomeAssistantHub:
     async def _post_json(self, path: str, data: dict) -> dict | list:
         url = urljoin(f"{self.host}/", path.lstrip("/"))
         try:
-            async with self._session.post(url, headers=self._headers, data=data) as response:
+            # Immich v3 validates request bodies strictly. Use JSON here so
+            # booleans stay booleans instead of becoming form strings.
+            async with self._session.post(url, headers=self._headers, json=data) as response:
                 if response.status != 200:
                     raise ApiError(await response.text())
                 return await response.json()
@@ -88,7 +90,7 @@ class ImmichHomeAssistantHub:
         return await self._download_binary(f"api/assets/{asset_id}/original")
 
     async def list_favorite_images(self) -> list[dict]:
-        result = await self._post_json("/api/search/metadata", {"isFavorite": "true"})
+        result = await self._post_json("/api/search/metadata", {"isFavorite": True})
         if not isinstance(result, dict):
             raise ApiError("Unexpected response")
         items = result.get("assets", {}).get("items", [])
