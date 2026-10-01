@@ -1,0 +1,45 @@
+{
+  "title": "ImmichHomeAssistant",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Verbinden met Immich",
+        "data": {
+          "host": "Immich-adres",
+          "api_key": "API-sleutel"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Opnieuw aanmelden bij Immich",
+        "description": "Voer een geldige API-sleutel in.",
+        "data": {
+          "api_key": "API-sleutel"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Kan geen verbinding maken met Immich",
+      "invalid_auth": "De API-sleutel is ongeldig",
+      "unknown": "Onverwachte fout"
+    },
+    "abort": {
+      "already_configured": "Deze Immich-server is al geconfigureerd",
+      "reauth_successful": "De API-sleutel is bijgewerkt"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Immich-instellingen",
+        "data": {
+          "watched_albums": "Albums waarvoor entities worden gemaakt",
+          "refresh_interval": "Verversingsinterval in seconden",
+          "no_repeat_window": "Aantal recente afbeeldingen dat niet wordt herhaald",
+          "tag_filter": "Tagfilter, kommagescheiden",
+          "shuffle_mode": "Shufflemodus",
+          "random_speed": "Willekeurige diavoorstellingssnelheid"
+        }
+      }
+    }
+  }
+}
