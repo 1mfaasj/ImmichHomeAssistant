@@ -6,12 +6,8 @@ Een Home Assistant custom integratie voor willekeurige afbeeldingen uit Immich-f
 
 - Favorieten en geselecteerde albums
 - Instelbaar verversingsinterval
-- No-repeat-window
 - Optioneel tagfilter
 - Shufflemodus en willekeurige snelheid
-- Automatisch opnieuw verbinden na een tijdelijke startfout
-- Herauthenticatie bij een ongeldige API-sleutel
-- Veilige diagnostiek
 
 ## Installatie
 
