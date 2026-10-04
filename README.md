@@ -1,14 +1,14 @@
 # ImmichHomeAssistant
 
-Een Home Assistant custom integratie voor willekeurige afbeeldingen uit Immich-favorieten en geselecteerde albums.
+A Home Assistant custom integration for displaying random images from Immich favorites and selected albums.
 
-## Functies
+## Features
 
-- Favorieten en geselecteerde albums
-- Instelbaar verversingsinterval
-- Optioneel tagfilter
-- Shufflemodus en willekeurige snelheid
+* Favorites and selected albums
+* Configurable refresh interval
+* Optional tag filter
+* Shuffle mode and random timing
 
-## Installatie
+## Installation
 
-Installeer via HACS als aangepaste repository en herstart Home Assistant.
+Install via HACS as a custom repository and restart Home Assistant.
