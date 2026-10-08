@@ -28,8 +28,14 @@ from .const import (
     MAX_REFRESH_INTERVAL,
     MIN_REFRESH_INTERVAL,
 )
-from .hub import ApiError, CannotConnect, ImmichHomeAssistantHub, InvalidAuth
+from .hub import (
+    ApiError,
+    CannotConnect,
+    ImmichHomeAssistantHub,
+    InvalidAuth,
+)
 from . import ENTITY_STORE, ImmichConfigEntry
+
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -42,42 +48,125 @@ async def async_setup_entry(
     """Stel de Immich image-entities in."""
     hub = config_entry.runtime_data
 
-    entities: list[BaseImmichHomeAssistantImage] = [
-        ImmichHomeAssistantFavoriteImage(hass, config_entry, hub)
-    ]
+    source_entities: list[BaseImmichHomeAssistantImage] = []
+    all_entities: list[ImageEntity] = []
 
-    watched_album_ids = config_entry.options.get(CONF_WATCHED_ALBUMS, [])
+    #
+    # Favorieten
+    #
+
+    favorite_entity = ImmichHomeAssistantFavoriteImage(
+        hass,
+        config_entry,
+        hub,
+    )
+
+    favorite_original_entity = ImmichOriginalImage(
+        hass,
+        favorite_entity,
+        "Immich Favorieten Origineel",
+        "immichhomeassistant_favorite_image_original",
+    )
+
+    favorite_entity.original_entity = (
+        favorite_original_entity
+    )
+
+    source_entities.append(favorite_entity)
+
+    all_entities.extend(
+        [
+            favorite_entity,
+            favorite_original_entity,
+        ]
+    )
+
+    #
+    # Albums
+    #
+
+    watched_album_ids = config_entry.options.get(
+        CONF_WATCHED_ALBUMS,
+        [],
+    )
 
     if watched_album_ids:
         try:
             albums = await hub.list_all_albums()
 
             album_map = {
-                album["id"]: album["albumName"]
+                album["id"\]: album["albumName"]
                 for album in albums
-                if album.get("id") and album.get("albumName")
+                if album.get("id")
+                and album.get("albumName")
             }
 
             for album_id in watched_album_ids:
-                if album_name := album_map.get(album_id):
-                    entities.append(
-                        ImmichHomeAssistantAlbumImage(
-                            hass,
-                            config_entry,
-                            hub,
-                            album_id,
-                            album_name,
-                        )
-                    )
+                album_name = album_map.get(album_id)
 
-        except (CannotConnect, InvalidAuth, ApiError) as error:
+                if not album_name:
+                    continue
+
+                album_entity = (
+                    ImmichHomeAssistantAlbumImage(
+                        hass,
+                        config_entry,
+                        hub,
+                        album_id,
+                        album_name,
+                    )
+                )
+
+                album_original_entity = (
+                    ImmichOriginalImage(
+                        hass,
+                        album_entity,
+                        f"Immich {album_name} Origineel",
+                        (
+                            "immichhomeassistant_album_"
+                            f"{album_id}_original"
+                        ),
+                    )
+                )
+
+                album_entity.original_entity = (
+                    album_original_entity
+                )
+
+                source_entities.append(
+                    album_entity
+                )
+
+                all_entities.extend(
+                    [
+                        album_entity,
+                        album_original_entity,
+                    ]
+                )
+
+        except (
+            CannotConnect,
+            InvalidAuth,
+            ApiError,
+        ) as error:
             _LOGGER.warning(
-                "Immich-albums konden niet worden geladen: %s",
+                "Immich-albums konden niet "
+                "worden geladen: %s",
                 error,
             )
 
-    hass.data.setdefault(ENTITY_STORE, {})[config_entry.entry_id] = entities
-    async_add_entities(entities)
+    #
+    # Alleen de normale entities worden opgeslagen
+    # voor services zoals volgende afbeelding,
+    # shuffle en refresh-interval.
+    #
+
+    hass.data.setdefault(
+        ENTITY_STORE,
+        {},
+    )[config_entry.entry_id] = source_entities
+
+    async_add_entities(all_entities)
 
 
 class BaseImmichHomeAssistantImage(ImageEntity):
@@ -104,7 +193,10 @@ class BaseImmichHomeAssistantImage(ImageEntity):
         self._attr_unique_id = unique_id
         self._attr_image_last_updated = None
 
-        self.access_tokens = deque([secrets.token_hex(32)], maxlen=2)
+        self.access_tokens = deque(
+            [secrets.token_hex(32)],
+            maxlen=2,
+        )
 
         options = config_entry.options
 
@@ -145,9 +237,11 @@ class BaseImmichHomeAssistantImage(ImageEntity):
 
         self._current_asset_id: str | None = None
 
-        # Datum/tijd van de huidige foto zoals bekend bij Immich.
+        # Datum/tijd van de huidige foto zoals
+        # bekend bij Immich.
         self._current_photo_date: datetime | None = None
 
+        # De kleine thumbnail voor de dashboardkaart.
         self._current_image_bytes: bytes | None = None
 
         self._last_asset_ids_refresh: datetime | None = None
@@ -157,16 +251,29 @@ class BaseImmichHomeAssistantImage(ImageEntity):
         self._asset_list: list[dict[str, Any]] = []
 
         self._recent_asset_ids: deque[str] = deque(
-            maxlen=max(self._no_repeat_window, 1)
+            maxlen=max(
+                self._no_repeat_window,
+                1,
+            )
         )
 
-        self._shuffle_queue: list[dict[str, Any]] = []
+        self._shuffle_queue: list[
+            dict[str, Any]
+        ] = []
 
         self._refresh_counter = 0
         self._unsub_refresh = None
 
+        # Bijbehorende entity voor de originele
+        # Immich-afbeelding.
+        self.original_entity: (
+            ImmichOriginalImage | None
+        ) = None
+
     @staticmethod
-    def _parse_tag_filter(value: str | None) -> set[str]:
+    def _parse_tag_filter(
+        value: str | None,
+    ) -> set[str\]:
         if not value:
             return set()
 
@@ -179,11 +286,15 @@ class BaseImmichHomeAssistantImage(ImageEntity):
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
 
-        await self._async_refresh(force_asset_list=True)
+        await self._async_refresh(
+            force_asset_list=True
+        )
 
         self._schedule_next_refresh()
 
-    async def async_will_remove_from_hass(self) -> None:
+    async def async_will_remove_from_hass(
+        self,
+    ) -> None:
         if self._unsub_refresh:
             self._unsub_refresh()
             self._unsub_refresh = None
@@ -213,29 +324,41 @@ class BaseImmichHomeAssistantImage(ImageEntity):
             return base
 
         return random.randint(
-            max(MIN_REFRESH_INTERVAL, base // 2),
+            max(
+                MIN_REFRESH_INTERVAL,
+                base // 2,
+            ),
             max(
                 MIN_REFRESH_INTERVAL,
                 int(base * 1.5),
             ),
         )
 
-    async def _handle_refresh(self, _now) -> None:
+    async def _handle_refresh(
+        self,
+        _now,
+    ) -> None:
         try:
             await self._async_refresh()
         finally:
             self._schedule_next_refresh()
 
-    async def _async_get_asset_list(self) -> list[dict[str, Any]]:
+    async def _async_get_asset_list(
+        self,
+    ) -> list[dict[str, Any]\]:
         raise NotImplementedError
 
-    async def _ensure_asset_list(self, force: bool = False) -> None:
+    async def _ensure_asset_list(
+        self,
+        force: bool = False,
+    ) -> None:
         now = datetime.now(UTC)
 
         expired = (
             self._last_asset_ids_refresh is None
             or (
-                now - self._last_asset_ids_refresh
+                now
+                - self._last_asset_ids_refresh
             ).total_seconds()
             >= ID_LIST_REFRESH_INTERVAL_SECONDS
         )
@@ -259,7 +382,7 @@ class BaseImmichHomeAssistantImage(ImageEntity):
     async def _apply_tag_filter(
         self,
         assets: list[dict[str, Any]],
-    ) -> list[dict[str, Any]]:
+    ) -> list[dict[str, Any]\]:
         if not self._tag_filter:
             return assets
 
@@ -272,8 +395,10 @@ class BaseImmichHomeAssistantImage(ImageEntity):
 
             if not tag_names:
                 try:
-                    details = await self.hub.get_asset_info(
-                        asset["id"]
+                    details = (
+                        await self.hub.get_asset_info(
+                            asset["id"]
+                        )
                     )
 
                     tag_names = self._extract_tags(
@@ -288,13 +413,17 @@ class BaseImmichHomeAssistantImage(ImageEntity):
                 ):
                     continue
 
-            if self._tag_filter.intersection(tag_names):
+            if self._tag_filter.intersection(
+                tag_names
+            ):
                 filtered.append(asset)
 
         return filtered
 
     @staticmethod
-    def _extract_tags(raw_tags: Any) -> set[str]:
+    def _extract_tags(
+        raw_tags: Any,
+    ) -> set[str\]:
         result: set[str] = set()
 
         if not isinstance(raw_tags, list):
@@ -305,34 +434,54 @@ class BaseImmichHomeAssistantImage(ImageEntity):
                 result.add(tag.casefold())
 
             elif isinstance(tag, dict):
-                if value := tag.get("value") or tag.get("name"):
-                    result.add(str(value).casefold())
+                value = (
+                    tag.get("value")
+                    or tag.get("name")
+                )
+
+                if value:
+                    result.add(
+                        str(value).casefold()
+                    )
 
         return result
 
-    def _candidates(self) -> list[dict[str, Any]]:
+    def _candidates(
+        self,
+    ) -> list[dict[str, Any]\]:
         candidates = [
             asset
             for asset in self._asset_list
-            if asset.get("id") != self._current_asset_id
-            and asset.get("id") not in self._recent_asset_ids
+            if (
+                asset.get("id")
+                != self._current_asset_id
+                and asset.get("id")
+                not in self._recent_asset_ids
+            )
         ]
 
         if not candidates:
             candidates = [
                 asset
                 for asset in self._asset_list
-                if asset.get("id") != self._current_asset_id
+                if (
+                    asset.get("id")
+                    != self._current_asset_id
+                )
             ]
 
         return candidates or self._asset_list[:]
 
-    def _select_next_asset(self) -> dict[str, Any] | None:
+    def _select_next_asset(
+        self,
+    ) -> dict[str, Any] | None:
         if not self._asset_list:
             return None
 
         if not self._shuffle_mode:
-            return random.choice(self._candidates())
+            return random.choice(
+                self._candidates()
+            )
 
         while self._shuffle_queue:
             asset = self._shuffle_queue.pop()
@@ -340,14 +489,18 @@ class BaseImmichHomeAssistantImage(ImageEntity):
             if asset in self._candidates():
                 return asset
 
-        self._shuffle_queue = self._candidates()
-        random.shuffle(self._shuffle_queue)
-
-        return (
-            self._shuffle_queue.pop()
-            if self._shuffle_queue
-            else None
+        self._shuffle_queue = (
+            self._candidates()
         )
+
+        random.shuffle(
+            self._shuffle_queue
+        )
+
+        if self._shuffle_queue:
+            return self._shuffle_queue.pop()
+
+        return None
 
     async def _async_refresh(
         self,
@@ -367,6 +520,11 @@ class BaseImmichHomeAssistantImage(ImageEntity):
 
             asset_id = asset["id"]
 
+            #
+            # Voor de normale dashboardkaart wordt
+            # eerst de kleine Immich-thumbnail gebruikt.
+            #
+
             try:
                 image_bytes = (
                     await self.hub.download_asset_thumbnail(
@@ -374,7 +532,13 @@ class BaseImmichHomeAssistantImage(ImageEntity):
                     )
                 )
 
-            except (CannotConnect, ApiError):
+            except (
+                CannotConnect,
+                ApiError,
+            ):
+                # Alleen als de thumbnail niet kan worden
+                # opgehaald, valt de integratie terug op
+                # het originele bestand.
                 image_bytes = (
                     await self.hub.download_asset(
                         asset_id
@@ -382,14 +546,12 @@ class BaseImmichHomeAssistantImage(ImageEntity):
                 )
 
             self._current_asset_id = asset_id
-
-            # Reset de vorige datum.
             self._current_photo_date = None
 
-            # Haal de volledige assetinformatie op uit Immich.
             #
-            # fileCreatedAt is de datum/tijd die Immich
-            # voor dit asset beschikbaar stelt.
+            # Haal de datum/tijd van de foto op.
+            #
+
             try:
                 asset_info = (
                     await self.hub.get_asset_info(
@@ -448,11 +610,20 @@ class BaseImmichHomeAssistantImage(ImageEntity):
                 self._last_successful_refresh
             )
 
+            #
+            # Maak de cache van de originele entity
+            # ongeldig zodra een nieuwe foto gekozen is.
+            #
+
+            if self.original_entity is not None:
+                self.original_entity.source_image_changed()
+
         except InvalidAuth as error:
             self._last_error = str(error)
 
             self._attr_available = (
-                self._current_image_bytes is not None
+                self._current_image_bytes
+                is not None
             )
 
             self.config_entry.async_start_reauth(
@@ -460,7 +631,8 @@ class BaseImmichHomeAssistantImage(ImageEntity):
             )
 
             _LOGGER.error(
-                "Authenticatie met Immich mislukt voor %s",
+                "Authenticatie met Immich "
+                "mislukt voor %s",
                 self.name,
             )
 
@@ -473,7 +645,8 @@ class BaseImmichHomeAssistantImage(ImageEntity):
             self._last_error = str(error)
 
             self._attr_available = (
-                self._current_image_bytes is not None
+                self._current_image_bytes
+                is not None
             )
 
             _LOGGER.warning(
@@ -485,7 +658,9 @@ class BaseImmichHomeAssistantImage(ImageEntity):
         finally:
             self.async_write_ha_state()
 
-    async def async_force_next_image(self) -> None:
+    async def async_force_next_image(
+        self,
+    ) -> None:
         await self._async_refresh()
         self._schedule_next_refresh()
 
@@ -524,39 +699,243 @@ class BaseImmichHomeAssistantImage(ImageEntity):
 
         self.async_write_ha_state()
 
-    async def async_image(self) -> bytes | None:
+    async def async_image(
+        self,
+    ) -> bytes | None:
+        """Geef de kleine thumbnail terug."""
         return self._current_image_bytes
+
+    @property
+    def extra_state_attributes(
+        self,
+    ) -> dict[str, Any\]:
+        return {
+            "refresh_interval": (
+                self._refresh_interval
+            ),
+            "no_repeat_window": (
+                self._no_repeat_window
+            ),
+            "tag_filter": sorted(
+                self._tag_filter
+            ),
+            "shuffle_mode": (
+                self._shuffle_mode
+            ),
+            "random_speed": (
+                self._random_speed
+            ),
+            "refresh_counter": (
+                self._refresh_counter
+            ),
+            "current_asset_id": (
+                self._current_asset_id
+            ),
+            "photo_date": (
+                self._current_photo_date
+            ),
+            "available_assets": len(
+                self._asset_list
+            ),
+            "last_successful_refresh": (
+                self._last_successful_refresh
+            ),
+            "last_error": (
+                self._last_error
+            ),
+        }
+
+
+class ImmichOriginalImage(ImageEntity):
+    """Originele afbeelding van de huidige Immich-foto."""
+
+    _attr_should_poll = False
+    _attr_content_type = "image/jpeg"
+    _attr_available = False
+
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        source_entity: BaseImmichHomeAssistantImage,
+   r,
+    ) -> None:
+        ImageEntity.__init__(self, hass)
+
+        self.source_entity = source_entity
+        self.hub = source_entity.hub
+
+        self._attr_name = name
+        self._attr_unique_id = unique_id
+        self._attr_image_last_updated = None
+
+        self.access_tokens = deque(
+            [secrets.token_hex(32)],
+            maxlen=2,
+        )
+
+        self._cached_asset_id: str | None = None
+        self._cached_image_bytes: bytes | None = None
+        self._last_error: str | None = None
+
+    async def async_added_to_hass(
+        self,
+    ) -> None:
+        await super().async_added_to_hass()
+
+        self._attr_available = (
+            self.source_entity._current_asset_id
+            is not None
+        )
+
+        self._attr_image_last_updated = (
+            self.source_entity._attr_image_last_updated
+        )
+
+        self.async_write_ha_state()
+
+    def source_image_changed(
+        self,
+    ) -> None:
+        """Verwerk dat de normale image-entity is gewijzigd."""
+        current_asset_id = (
+            self.source_entity._current_asset_id
+        )
+
+        if current_asset_id != self._cached_asset_id:
+            self._cached_asset_id = None
+            self._cached_image_bytes = None
+
+        self._last_error = None
+
+        self._attr_available = (
+            current_asset_id is not None
+        )
+
+        self._attr_image_last_updated = (
+            self.source_entity._attr_image_last_updated
+        )
+
+        self.access_tokens.append(
+            secrets.token_hex(32)
+        )
+
+        # Alleen een state schrijven wanneer de entity
+        # al volledig aan Home Assistant is toegevoegd.
+        if self.entity_id is not None:
+            self.async_write_ha_state()
+
+    async def async_image(
+        self,
+    ) -> bytes | None:
+        """
+        Haal de originele Immich-foto pas op wanneer
+        Home Assistant de afbeelding daadwerkelijk opent.
+        """
+        asset_id = (
+            self.source_entity._current_asset_id
+        )
+
+        if not asset_id:
+            self._attr_available = False
+            return None
+
+        #
+        # Gebruik de gecachete originele foto zolang
+        # hetzelfde asset actief is.
+        #
+
+        if (
+            self._cached_asset_id == asset_id
+            and self._cached_image_bytes is not None
+        ):
+            return self._cached_image_bytes
+
+        try:
+            image_bytes = (
+                await self.hub.download_asset(
+                    asset_id
+                )
+            )
+
+            self._cached_asset_id = asset_id
+            self._cached_image_bytes = image_bytes
+            self._last_error = None
+            self._attr_available = True
+
+            return image_bytes
+
+        except InvalidAuth as error:
+            self._last_error = str(error)
+            self._attr_available = False
+
+            self.source_entity.config_entry.async_start_reauth(
+                self.hass
+            )
+
+            _LOGGER.error(
+                "Authenticatie met Immich mislukte "
+                "bij ophalen van originele foto %s",
+                asset_id,
+            )
+
+            return None
+
+        except (
+            CannotConnect,
+            ApiError,
+        ) as error:
+            self._last_error = str(error)
+            self._attr_available = False
+
+            _LOGGER.warning(
+                "Originele Immich-foto %s kon "
+                "niet worden opgehaald: %s",
+                asset_id,
+                error,
+            )
+
+            return None
+
+        finally:
+            if self.entity_id is not None:
+                self.async_write_ha_state()
 
     @property
     def extra_state_attributes(
         self,
     ) -> dict[str, Any]:
         return {
-            "refresh_interval": self._refresh_interval,
-            "no_repeat_window": self._no_repeat_window,
-            "tag_filter": sorted(self._tag_filter),
-            "shuffle_mode": self._shuffle_mode,
-            "random_speed": self._random_speed,
-            "refresh_counter": self._refresh_counter,
-            "current_asset_id": self._current_asset_id,
-
-            # Datum en tijd van de foto volgens Immich.
-            "photo_date": self._current_photo_date,
-
-            "available_assets": len(self._asset_list),
-            "last_successful_refresh": self._last_successful_refresh,
-            "last_error": self._last_error,
+            "current_asset_id": (
+                self.source_entity._current_asset_id
+            ),
+            "photo_date": (
+                self.source_entity._current_photo_date
+            ),
+            "source_entity": (
+                self.source_entity.entity_id
+            ),
+            "image_quality": "original",
+            "cached": (
+                self._cached_image_bytes is not None
+                and self._cached_asset_id
+                == self.source_entity._current_asset_id
+            ),
+            "last_error": (
+                self._last_error
+            ),
         }
 
 
 class ImmichHomeAssistantFavoriteImage(
     BaseImmichHomeAssistantImage
 ):
+    """Willekeurige afbeelding uit Immich-favorieten."""
+
     def __init__(
         self,
-        hass,
-        config_entry,
-        hub,
+        hass: HomeAssistant,
+        config_entry: ImmichConfigEntry,
+        hub: ImmichHomeAssistantHub,
     ) -> None:
         super().__init__(
             hass,
@@ -569,17 +948,21 @@ class ImmichHomeAssistantFavoriteImage(
     async def _async_get_asset_list(
         self,
     ) -> list[dict[str, Any]]:
-        return await self.hub.list_favorite_images()
+        return (
+            await self.hub.list_favorite_images()
+        )
 
 
 class ImmichHomeAssistantAlbumImage(
     BaseImmichHomeAssistantImage
 ):
+    """Willekeurige afbeelding uit een Immich-album."""
+
     def __init__(
         self,
-        hass,
-        config_entry,
-        hub,
+        hass: HomeAssistant,
+        config_entry: ImmichConfigEntry,
+        hub: ImmichHomeAssistantHub,
         album_id: str,
         album_name: str,
     ) -> None:
@@ -591,7 +974,10 @@ class ImmichHomeAssistantAlbumImage(
             config_entry,
             hub,
             f"Immich {album_name}",
-            f"immichhomeassistant_album_{album_id}",
+            (
+                "immichhomeassistant_album_"
+                f"{album_id}"
+            ),
         )
 
     async def _async_get_asset_list(
