@@ -95,7 +95,7 @@ async def async_setup_entry(
             albums = await hub.list_all_albums()
 
             album_map = {
-                album["id"\]: album["albumName"]
+                album["id"]: album["albumName"]
                 for album in albums
                 if album.get("id")
                 and album.get("albumName")
