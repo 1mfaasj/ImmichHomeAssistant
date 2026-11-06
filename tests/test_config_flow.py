@@ -86,3 +86,11 @@ async def test_options_flow_saves(
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert config_entry.options[CONF_WATCHED_ALBUMS] == ["album-2"]
+
+
+def test_normalize_url() -> None:
+    from custom_components.immichhomeassistant.config_flow import normalize_url
+
+    assert normalize_url(" Immich.Local:2283/ ") == "https://immich.local:2283"
+    assert normalize_url("http://192.168.1.10:2283/") == "http://192.168.1.10:2283"
+    assert normalize_url("https://example.com/immich/?x=1") == "https://example.com/immich"

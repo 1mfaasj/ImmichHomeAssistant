@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 from typing import Any
-from urllib.parse import urlparse
 
 import voluptuous as vol
 from homeassistant import config_entries
@@ -18,7 +17,7 @@ from homeassistant.helpers.selector import (
     TextSelector,
     TextSelectorConfig,
 )
-from url_normalize import url_normalize
+from yarl import URL
 
 from .const import (
     CONF_NO_REPEAT_WINDOW,
@@ -50,16 +49,30 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
 )
 
 
+def normalize_url(value: str) -> str:
+    """Maak een nette basis-URL: schema toevoegen (standaard https), geen slash."""
+    value = value.strip()
+    if "://" not in value:
+        value = f"https://{value}"
+    try:
+        url = URL(value).with_query(None).with_fragment(None)
+    except ValueError as error:
+        raise CannotConnect(f"Ongeldig adres: {value}") from error
+    if not url.host:
+        raise CannotConnect(f"Ongeldig adres: {value}")
+    return str(url).rstrip("/")
+
+
 async def validate_input(
     hass, data: dict[str, Any]
 ) -> dict[str, Any]:
     """Valideer de verbinding en geef genormaliseerde data terug."""
-    url = url_normalize(data[CONF_HOST]).rstrip("/")
+    url = normalize_url(data[CONF_HOST])
     hub = ImmichHomeAssistantHub(hass, url, data[CONF_API_KEY])
     await hub.authenticate()
     user_info = await hub.get_my_user_info()
     username = user_info.get("name") or user_info.get("email") or "Immich"
-    hostname = urlparse(url).hostname or url
+    hostname = URL(url).host or url
     return {
         "title": f"{username} @ {hostname}",
         "data": {CONF_HOST: url, CONF_API_KEY: data[CONF_API_KEY]},

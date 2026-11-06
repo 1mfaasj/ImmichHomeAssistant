@@ -142,3 +142,7 @@ pytest
 ```
 
 GitHub Actions runs hassfest, the HACS validation and the tests on every push.
+
+## License
+
+MIT, see [LICENSE](LICENSE).
