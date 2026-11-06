@@ -53,7 +53,6 @@ async def test_setup_creates_entities(
         ("image", "immichhomeassistant_favorite_image_original"),
         ("image", "immichhomeassistant_album_album-1"),
         ("image", "immichhomeassistant_album_album-1_original"),
-        ("image", "immichhomeassistant_on_this_day"),
         ("button", "immichhomeassistant_favorite_image_next"),
         ("button", "immichhomeassistant_album_album-1_next"),
         ("switch", "immichhomeassistant_shuffle_mode"),

@@ -38,7 +38,6 @@
         "title": "Immich-instellingen",
         "data": {
           "watched_albums": "Albums waarvoor entities worden gemaakt",
-          "on_this_day": "'Op deze dag'-afbeelding",
           "refresh_interval": "Verversingsinterval in seconden",
           "no_repeat_window": "Aantal recente afbeeldingen dat niet wordt herhaald",
           "tag_filter": "Tagfilter, kommagescheiden",
@@ -46,8 +45,7 @@
           "random_speed": "Willekeurige diavoorstellingssnelheid"
         },
         "data_description": {
-          "tag_filter": "Toon alleen foto's met minstens één van deze tags. Geldt niet voor 'Op deze dag'.",
-          "on_this_day": "Toon foto's uit de 'Op deze dag'-herinneringen van Immich."
+          "tag_filter": "Toon alleen foto's met minstens één van deze tags."
         }
       }
     },
@@ -69,20 +67,11 @@
       },
       "album_original": {
         "name": "{album} Origineel"
-      },
-      "on_this_day": {
-        "name": "Op deze dag"
-      },
-      "on_this_day_original": {
-        "name": "Op deze dag Origineel"
       }
     },
     "button": {
       "next_favorites": {
         "name": "Favorieten volgende foto"
-      },
-      "next_on_this_day": {
-        "name": "Op deze dag volgende foto"
       },
       "next_album": {
         "name": "{album} volgende foto"

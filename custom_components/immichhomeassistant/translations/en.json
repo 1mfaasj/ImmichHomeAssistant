@@ -38,7 +38,6 @@
         "title": "Immich settings",
         "data": {
           "watched_albums": "Albums to create entities for",
-          "on_this_day": "'On this day' image",
           "refresh_interval": "Refresh interval in seconds",
           "no_repeat_window": "Number of recent images that are not repeated",
           "tag_filter": "Tag filter, comma separated",
@@ -46,8 +45,7 @@
           "random_speed": "Random slideshow speed"
         },
         "data_description": {
-          "tag_filter": "Only show images with at least one of these tags. Does not apply to 'On this day'.",
-          "on_this_day": "Show photos from Immich's 'On this day' memories."
+          "tag_filter": "Only show images with at least one of these tags."
         }
       }
     },
@@ -69,20 +67,11 @@
       },
       "album_original": {
         "name": "{album} original"
-      },
-      "on_this_day": {
-        "name": "On this day"
-      },
-      "on_this_day_original": {
-        "name": "On this day original"
       }
     },
     "button": {
       "next_favorites": {
         "name": "Favorites next image"
-      },
-      "next_on_this_day": {
-        "name": "On this day next image"
       },
       "next_album": {
         "name": "{album} next image"

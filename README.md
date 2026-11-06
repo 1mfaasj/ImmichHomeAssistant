@@ -1,12 +1,11 @@
 # ImmichHomeAssistant
 
 A Home Assistant custom integration that shows rotating photos from your
-[Immich](https://immich.app) server: your favorites, selected albums and the
-"On this day" memories. Ideal for dashboards and digital photo frames.
+[Immich](https://immich.app) server: your favorites and selected albums. Ideal for dashboards and digital photo frames.
 
 ## Features
 
-* **Image entities** for favorites, every selected album and "On this day".
+* **Image entities** for favorites and every selected album.
   Each source also gets an *original* entity that loads the full-resolution
   photo only when you open it (HEIC/RAW photos are converted by Immich).
 * **Controls**: a *next image* button per source, switches for shuffle mode
@@ -16,7 +15,7 @@ A Home Assistant custom integration that shows rotating photos from your
   (filtered server-side by Immich).
 * **No-repeat window**: the last *n* photos are not shown again.
 * **Rich attributes** for captions: `photo_date`, `city`, `state`, `country`,
-  `description`, `people`, `file_name` (and `years_ago` for "On this day").
+  `description`, `people` and `file_name`.
 * Actions (services) for automations: `next_image`, `set_shuffle_mode`,
   `set_random_speed`, `set_refresh_interval`.
 * Diagnostics download (API key redacted) and Dutch and English translations.
@@ -29,7 +28,7 @@ A Home Assistant custom integration that shows rotating photos from your
 3. Go to **Settings → Devices & services → Add integration → ImmichHomeAssistant**.
 4. Enter the Immich URL (for example `http://192.168.1.10:2283`) and an API key.
    Create the key in Immich under **Account settings → API keys**. It needs
-   read access to assets, albums, tags and memories.
+   read access to assets, albums and tags.
 
 Only one Immich server can be configured.
 
@@ -38,10 +37,9 @@ Only one Immich server can be configured.
 | Option | Description |
 | --- | --- |
 | Albums | Albums for which image entities are created |
-| On this day | Create the "On this day" image entity |
 | Refresh interval | Seconds between images (10–3600) |
 | No-repeat window | Number of recent images that are not repeated |
-| Tag filter | Comma-separated tag names; does not apply to "On this day" |
+| Tag filter | Comma-separated tag names |
 | Shuffle mode | Show every photo once before repeating |
 | Random speed | Vary the interval between 50 % and 150 % |
 
@@ -57,7 +55,6 @@ Entity IDs depend on your Home Assistant language. With Dutch, for example:
 | --- | --- |
 | `image.immich_favorieten` | Rotating favorite (preview size, ~1440 px) |
 | `image.immich_favorieten_origineel` | Full resolution of the current favorite |
-| `image.immich_op_deze_dag` | Rotating photo from today's memories |
 | `image.immich_<album>` | Rotating photo from an album |
 | `button.immich_favorieten_volgende_foto` | Skip to the next favorite |
 | `switch.immich_shufflemodus` | Shuffle mode for all sources |

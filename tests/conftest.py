@@ -57,7 +57,6 @@ def mock_hub() -> Generator[AsyncMock]:
         hub.list_all_albums.return_value = [{"id": "album-1", "albumName": "Vakantie"}]
         hub.list_favorite_images.return_value = [make_asset("fav-1"), make_asset("fav-2")]
         hub.list_album_images.return_value = [make_asset("alb-1")]
-        hub.list_on_this_day_images.return_value = [make_asset("otd-1")]
         hub.download_asset_preview.return_value = (b"preview", "image/webp")
         hub.download_asset_fullsize.return_value = (b"fullsize", "image/jpeg")
         hub.download_asset.return_value = (b"original", "image/jpeg")

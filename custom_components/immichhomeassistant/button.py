@@ -10,7 +10,6 @@ from .models import ImageSource, ImmichConfigEntry, SourceKind
 
 _TRANSLATION_KEYS = {
     SourceKind.FAVORITES: "next_favorites",
-    SourceKind.ON_THIS_DAY: "next_on_this_day",
     SourceKind.ALBUM: "next_album",
 }
 

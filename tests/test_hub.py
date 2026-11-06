@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
-
 import pytest
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
@@ -79,38 +77,3 @@ async def test_heic_original_rejected(
     hub = ImmichHomeAssistantHub(hass, HOST, "key")
     with pytest.raises(ApiError):
         await hub.download_asset("x")
-
-
-async def test_on_this_day_filters_current_memories(
-    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
-) -> None:
-    now = datetime(2026, 11, 6, 12, tzinfo=UTC)
-    aioclient_mock.get(
-        f"{HOST}/api/memories",
-        json=[
-            {
-                "type": "on_this_day",
-                "showAt": "2026-11-06T00:00:00Z",
-                "hideAt": "2026-11-07T00:00:00Z",
-                "assets": [make_asset("today"), make_asset("today")],
-            },
-            {
-                "type": "on_this_day",
-                "showAt": "2026-11-05T00:00:00Z",
-                "hideAt": "2026-11-06T00:00:00Z",
-                "assets": [make_asset("yesterday")],
-            },
-            {
-                "type": "on_this_day",
-                "memoryAt": "2019-11-06T00:00:00Z",
-                "assets": [make_asset("legacy"), make_asset("video", type="VIDEO")],
-            },
-        ],
-    )
-    hub = ImmichHomeAssistantHub(hass, HOST, "key")
-
-    assets = await hub.list_on_this_day_images(now)
-
-    assert [a["id"] for a in assets] == ["today", "legacy"]
-    # Immich accepteert alleen een datum (YYYY-MM-DD), geen tijdstempel.
-    assert aioclient_mock.mock_calls[0][1].query["for"] == "2026-11-06"

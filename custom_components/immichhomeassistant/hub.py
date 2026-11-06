@@ -179,40 +179,6 @@ class ImmichHomeAssistantHub:
             if isinstance(item, dict) and item.get("type") == "IMAGE"
         ]
 
-    async def list_on_this_day_images(
-        self, now: datetime | None = None
-    ) -> list[dict[str, Any]]:
-        """Foto's uit de 'Op deze dag'-herinneringen van vandaag."""
-        now = now or datetime.now(UTC)
-        result = await self._request_json(
-            "GET",
-            "api/memories",
-            params={
-                "type": "on_this_day",
-                "for": now.date().isoformat(),
-                "isTrashed": "false",
-            },
-        )
-        if not isinstance(result, list):
-            raise ApiError("Onverwachte herinneringenresponse")
-
-        items: list[dict[str, Any]] = []
-        seen: set[str] = set()
-        for memory in result:
-            if not isinstance(memory, dict) or not _memory_is_current(memory, now):
-                continue
-            for asset in memory.get("assets", []):
-                if (
-                    isinstance(asset, dict)
-                    and asset.get("type") == "IMAGE"
-                    and asset.get("id")
-                    and asset["id"] not in seen
-                    and not asset.get("isTrashed")
-                ):
-                    seen.add(asset["id"])
-                    items.append(asset)
-        return items
-
     # --------------------------------------------------------------- download
 
     async def _download_binary(
@@ -262,33 +228,6 @@ class ImmichHomeAssistantHub:
 
     async def download_asset(self, asset_id: str) -> tuple[bytes, str]:
         return await self._download_binary(f"api/assets/{asset_id}/original")
-
-
-def _parse_datetime(value: Any) -> datetime | None:
-    if not value:
-        return None
-    try:
-        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
-
-
-def _memory_is_current(memory: dict[str, Any], now: datetime) -> bool:
-    if memory.get("type", "on_this_day") != "on_this_day":
-        return False
-    if memory.get("isTrashed") or memory.get("deletedAt"):
-        return False
-    show_at = _parse_datetime(memory.get("showAt"))
-    hide_at = _parse_datetime(memory.get("hideAt"))
-    if show_at or hide_at:
-        return (show_at is None or show_at <= now) and (
-            hide_at is None or now < hide_at
-        )
-    memory_at = _parse_datetime(memory.get("memoryAt"))
-    if memory_at is None:
-        return True
-    return (memory_at.month, memory_at.day) == (now.month, now.day)
 
 
 class CannotConnect(HomeAssistantError):

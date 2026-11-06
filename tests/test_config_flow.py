@@ -76,7 +76,6 @@ async def test_options_flow_saves(
             result["flow_id"],
             {
                 CONF_WATCHED_ALBUMS: ["album-2"],
-                "on_this_day": False,
                 "refresh_interval": 120,
                 "no_repeat_window": 5,
                 "shuffle_mode": True,

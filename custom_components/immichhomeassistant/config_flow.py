@@ -22,14 +22,12 @@ from url_normalize import url_normalize
 
 from .const import (
     CONF_NO_REPEAT_WINDOW,
-    CONF_ON_THIS_DAY,
     CONF_RANDOM_SPEED,
     CONF_REFRESH_INTERVAL,
     CONF_SHUFFLE_MODE,
     CONF_TAG_FILTER,
     CONF_WATCHED_ALBUMS,
     DEFAULT_NO_REPEAT_WINDOW,
-    DEFAULT_ON_THIS_DAY,
     DEFAULT_RANDOM_SPEED,
     DEFAULT_REFRESH_INTERVAL,
     DEFAULT_SHUFFLE_MODE,
@@ -183,10 +181,6 @@ class OptionsFlowHandler(config_entries.OptionsFlowWithReload):
                 vol.Required(CONF_WATCHED_ALBUMS, default=current): cv.multi_select(
                     album_map
                 ),
-                vol.Required(
-                    CONF_ON_THIS_DAY,
-                    default=options.get(CONF_ON_THIS_DAY, DEFAULT_ON_THIS_DAY),
-                ): BooleanSelector(),
                 vol.Required(
                     CONF_REFRESH_INTERVAL,
                     default=options.get(

@@ -5,7 +5,7 @@ import logging
 import random
 import secrets
 from collections import deque
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from typing import Any
 
 import voluptuous as vol
@@ -15,7 +15,6 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_platform
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.event import async_call_later
-from homeassistant.util import dt as dt_util
 
 from .const import (
     CONF_NO_REPEAT_WINDOW,
@@ -31,7 +30,6 @@ from .const import (
     DOMAIN,
     ID_LIST_REFRESH_INTERVAL_SECONDS,
     MAX_REFRESH_INTERVAL,
-    MEMORY_LIST_REFRESH_INTERVAL_SECONDS,
     MIN_REFRESH_INTERVAL,
     original_unique_id,
 )
@@ -103,8 +101,6 @@ def _create_source_entity(
 ) -> BaseImmichHomeAssistantImage:
     if source.kind is SourceKind.ALBUM:
         return ImmichHomeAssistantAlbumImage(hass, entry, source)
-    if source.kind is SourceKind.ON_THIS_DAY:
-        return ImmichOnThisDayImage(hass, entry, source)
     return ImmichHomeAssistantFavoriteImage(hass, entry, source)
 
 
@@ -675,39 +671,3 @@ class ImmichHomeAssistantAlbumImage(BaseImmichHomeAssistantImage):
             "album_id": self.album_id,
             "album_name": self.album_name,
         }
-
-
-class ImmichOnThisDayImage(BaseImmichHomeAssistantImage):
-    """Foto's van 'Op deze dag' (Immich-herinneringen) van vandaag."""
-
-    _attr_translation_key = "on_this_day"
-    _supports_tag_filter = False
-    _asset_list_ttl = MEMORY_LIST_REFRESH_INTERVAL_SECONDS
-
-    def __init__(
-        self,
-        hass: HomeAssistant,
-        config_entry: ImmichConfigEntry,
-        source: ImageSource,
-    ) -> None:
-        super().__init__(hass, config_entry, source)
-        self._asset_list_date: date | None = None
-
-    def _asset_list_expired(self, now: datetime) -> bool:
-        return (
-            super()._asset_list_expired(now)
-            or self._asset_list_date != dt_util.now().date()
-        )
-
-    async def _async_fetch_assets(self) -> list[dict[str, Any]]:
-        self._asset_list_date = dt_util.now().date()
-        return await self.hub.list_on_this_day_images(dt_util.now())
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        attributes = super().extra_state_attributes
-        photo_date = attributes.get("photo_date")
-        attributes["years_ago"] = (
-            dt_util.now().year - photo_date.year if photo_date else None
-        )
-        return attributes
