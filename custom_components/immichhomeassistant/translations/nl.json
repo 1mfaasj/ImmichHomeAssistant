@@ -7,6 +7,10 @@
         "data": {
           "host": "Immich-adres",
           "api_key": "API-sleutel"
+        },
+        "data_description": {
+          "host": "Bijvoorbeeld http://192.168.1.10:2283",
+          "api_key": "Maak een API-sleutel aan in Immich via Accountinstellingen → API-sleutels."
         }
       },
       "reauth_confirm": {
@@ -24,6 +28,7 @@
     },
     "abort": {
       "already_configured": "Deze Immich-server is al geconfigureerd",
+      "single_instance_allowed": "Er kan maar één Immich-server worden ingesteld.",
       "reauth_successful": "De API-sleutel is bijgewerkt"
     }
   },
@@ -33,11 +38,102 @@
         "title": "Immich-instellingen",
         "data": {
           "watched_albums": "Albums waarvoor entities worden gemaakt",
+          "on_this_day": "'Op deze dag'-afbeelding",
           "refresh_interval": "Verversingsinterval in seconden",
           "no_repeat_window": "Aantal recente afbeeldingen dat niet wordt herhaald",
           "tag_filter": "Tagfilter, kommagescheiden",
           "shuffle_mode": "Shufflemodus",
           "random_speed": "Willekeurige diavoorstellingssnelheid"
+        },
+        "data_description": {
+          "tag_filter": "Toon alleen foto's met minstens één van deze tags. Geldt niet voor 'Op deze dag'.",
+          "on_this_day": "Toon foto's uit de 'Op deze dag'-herinneringen van Immich."
+        }
+      }
+    },
+    "abort": {
+      "cannot_connect": "De albums konden niet uit Immich worden geladen. Probeer het later opnieuw; je huidige instellingen zijn niet gewijzigd.",
+      "invalid_auth": "De API-sleutel is ongeldig"
+    }
+  },
+  "entity": {
+    "image": {
+      "favorites": {
+        "name": "Favorieten"
+      },
+      "favorites_original": {
+        "name": "Favorieten Origineel"
+      },
+      "album": {
+        "name": "{album}"
+      },
+      "album_original": {
+        "name": "{album} Origineel"
+      },
+      "on_this_day": {
+        "name": "Op deze dag"
+      },
+      "on_this_day_original": {
+        "name": "Op deze dag Origineel"
+      }
+    },
+    "button": {
+      "next_favorites": {
+        "name": "Favorieten volgende foto"
+      },
+      "next_on_this_day": {
+        "name": "Op deze dag volgende foto"
+      },
+      "next_album": {
+        "name": "{album} volgende foto"
+      }
+    },
+    "switch": {
+      "shuffle_mode": {
+        "name": "Shufflemodus"
+      },
+      "random_speed": {
+        "name": "Willekeurige diavoorstellingssnelheid"
+      }
+    },
+    "number": {
+      "refresh_interval": {
+        "name": "Verversingsinterval"
+      }
+    }
+  },
+  "services": {
+    "next_image": {
+      "name": "Volgende afbeelding",
+      "description": "Wissel direct naar de volgende afbeelding."
+    },
+    "set_shuffle_mode": {
+      "name": "Shufflemodus instellen",
+      "description": "Schakel shufflemodus tijdelijk in of uit voor de gekozen afbeeldingen.",
+      "fields": {
+        "enabled": {
+          "name": "Ingeschakeld",
+          "description": "Of de instelling aan moet staan."
+        }
+      }
+    },
+    "set_random_speed": {
+      "name": "Willekeurige snelheid instellen",
+      "description": "Varieer het verversingsinterval tijdelijk tussen 50 en 150 procent.",
+      "fields": {
+        "enabled": {
+          "name": "Ingeschakeld",
+          "description": "Of de instelling aan moet staan."
+        }
+      }
+    },
+    "set_refresh_interval": {
+      "name": "Verversingsinterval instellen",
+      "description": "Wijzig tijdelijk het verversingsinterval van de gekozen afbeeldingen.",
+      "fields": {
+        "seconds": {
+          "name": "Seconden",
+          "description": "Nieuw verversingsinterval in seconden."
         }
       }
     }

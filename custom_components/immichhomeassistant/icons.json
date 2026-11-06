@@ -1,0 +1,33 @@
+{
+  "entity": {
+    "image": {
+      "favorites": { "default": "mdi:heart" },
+      "favorites_original": { "default": "mdi:heart-outline" },
+      "album": { "default": "mdi:image-album" },
+      "album_original": { "default": "mdi:image-album" },
+      "on_this_day": { "default": "mdi:calendar-heart" },
+      "on_this_day_original": { "default": "mdi:calendar-heart" }
+    },
+    "button": {
+      "next_favorites": { "default": "mdi:skip-next" },
+      "next_on_this_day": { "default": "mdi:skip-next" },
+      "next_album": { "default": "mdi:skip-next" }
+    },
+    "switch": {
+      "shuffle_mode": {
+        "default": "mdi:shuffle-disabled",
+        "state": { "on": "mdi:shuffle-variant" }
+      },
+      "random_speed": { "default": "mdi:timer-sand" }
+    },
+    "number": {
+      "refresh_interval": { "default": "mdi:timer-outline" }
+    }
+  },
+  "services": {
+    "next_image": { "service": "mdi:skip-next" },
+    "set_shuffle_mode": { "service": "mdi:shuffle-variant" },
+    "set_random_speed": { "service": "mdi:timer-sand" },
+    "set_refresh_interval": { "service": "mdi:timer-outline" }
+  }
+}

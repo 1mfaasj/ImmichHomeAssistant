@@ -1,66 +1,38 @@
 next_image:
-  name: Volgende afbeelding
-  description: Wissel direct naar de volgende afbeelding.
-  fields:
-    entity_id:
-      name: Afbeeldingsentiteit
-      required: false
-      selector:
-        entity:
-          multiple: true
-          filter:
-            domain: image
+  target:
+    entity:
+      integration: immichhomeassistant
+      domain: image
 
 set_shuffle_mode:
-  name: Shufflemodus instellen
-  description: Schakel shufflemodus direct in of uit.
+  target:
+    entity:
+      integration: immichhomeassistant
+      domain: image
   fields:
-    entity_id:
-      name: Afbeeldingsentiteit
-      required: false
-      selector:
-        entity:
-          multiple: true
-          filter:
-            domain: image
     enabled:
-      name: Ingeschakeld
       required: true
       selector:
         boolean:
 
 set_random_speed:
-  name: Willekeurige snelheid instellen
-  description: Varieer het verversingsinterval tussen 50 en 150 procent.
+  target:
+    entity:
+      integration: immichhomeassistant
+      domain: image
   fields:
-    entity_id:
-      name: Afbeeldingsentiteit
-      required: false
-      selector:
-        entity:
-          multiple: true
-          filter:
-            domain: image
     enabled:
-      name: Ingeschakeld
       required: true
       selector:
         boolean:
 
 set_refresh_interval:
-  name: Verversingsinterval instellen
-  description: Wijzig tijdelijk het verversingsinterval.
+  target:
+    entity:
+      integration: immichhomeassistant
+      domain: image
   fields:
-    entity_id:
-      name: Afbeeldingsentiteit
-      required: false
-      selector:
-        entity:
-          multiple: true
-          filter:
-            domain: image
     seconds:
-      name: Seconden
       required: true
       selector:
         number:
@@ -68,3 +40,4 @@ set_refresh_interval:
           max: 3600
           step: 1
           mode: box
+          unit_of_measurement: s

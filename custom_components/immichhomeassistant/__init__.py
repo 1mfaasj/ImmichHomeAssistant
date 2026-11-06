@@ -1,104 +1,42 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
 import logging
 
-import voluptuous as vol
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import ATTR_ENTITY_ID, CONF_API_KEY, CONF_HOST, Platform
-from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.const import CONF_API_KEY, CONF_HOST, Platform
+from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
-import homeassistant.helpers.config_validation as cv
+from homeassistant.helpers import entity_registry as er
 
 from .const import (
-    DOMAIN,
-    MAX_REFRESH_INTERVAL,
-    MIN_REFRESH_INTERVAL,
+    CONF_ON_THIS_DAY,
+    CONF_WATCHED_ALBUMS,
+    DEFAULT_ON_THIS_DAY,
+    UID_RANDOM_SPEED,
+    UID_REFRESH_INTERVAL,
+    UID_SHUFFLE_MODE,
+    next_button_unique_id,
+    original_unique_id,
 )
-from .hub import CannotConnect, ImmichHomeAssistantHub, InvalidAuth
+from .hub import ApiError, CannotConnect, ImmichHomeAssistantHub, InvalidAuth
+from .models import (
+    ImageSource,
+    ImmichConfigEntry,
+    ImmichRuntimeData,
+    SourceKind,
+    build_device_info,
+)
 
 _LOGGER = logging.getLogger(__name__)
-PLATFORMS: list[Platform] = [Platform.IMAGE]
 
-type ImmichConfigEntry = ConfigEntry[ImmichHomeAssistantHub]
-
-SERVICE_NEXT_IMAGE = "next_image"
-SERVICE_SET_SHUFFLE_MODE = "set_shuffle_mode"
-SERVICE_SET_RANDOM_SPEED = "set_random_speed"
-SERVICE_SET_REFRESH_INTERVAL = "set_refresh_interval"
-ATTR_ENABLED = "enabled"
-ATTR_SECONDS = "seconds"
-ENTITY_STORE = f"{DOMAIN}_entities"
-
-SERVICE_ENTITY_SCHEMA = vol.Schema(
-    {vol.Optional(ATTR_ENTITY_ID): vol.Any(cv.entity_id, [cv.entity_id])}
-)
-SERVICE_ENABLED_SCHEMA = SERVICE_ENTITY_SCHEMA.extend(
-    {vol.Required(ATTR_ENABLED): cv.boolean}
-)
-SERVICE_INTERVAL_SCHEMA = SERVICE_ENTITY_SCHEMA.extend(
-    {
-        vol.Required(ATTR_SECONDS): vol.All(
-            vol.Coerce(int),
-            vol.Range(min=MIN_REFRESH_INTERVAL, max=MAX_REFRESH_INTERVAL),
-        )
-    }
-)
+PLATFORMS: list[Platform] = [
+    Platform.IMAGE,
+    Platform.BUTTON,
+    Platform.SWITCH,
+    Platform.NUMBER,
+]
 
 
-def _iter_entities(hass: HomeAssistant) -> Iterable:
-    for entity_list in hass.data.get(ENTITY_STORE, {}).values():
-        yield from entity_list
-
-
-def _target_entities(hass: HomeAssistant, call: ServiceCall) -> list:
-    requested = call.data.get(ATTR_ENTITY_ID)
-    if requested is None:
-        return list(_iter_entities(hass))
-    entity_ids = {requested} if isinstance(requested, str) else set(requested)
-    return [entity for entity in _iter_entities(hass) if entity.entity_id in entity_ids]
-
-
-async def async_setup(hass: HomeAssistant, config: dict) -> bool:
-    """Registreer integratiebrede acties."""
-    hass.data.setdefault(ENTITY_STORE, {})
-
-    async def handle_next_image(call: ServiceCall) -> None:
-        for entity in _target_entities(hass, call):
-            await entity.async_force_next_image()
-
-    async def handle_set_shuffle_mode(call: ServiceCall) -> None:
-        for entity in _target_entities(hass, call):
-            await entity.async_set_shuffle_mode(bool(call.data[ATTR_ENABLED]))
-
-    async def handle_set_random_speed(call: ServiceCall) -> None:
-        for entity in _target_entities(hass, call):
-            await entity.async_set_random_speed(bool(call.data[ATTR_ENABLED]))
-
-    async def handle_set_refresh_interval(call: ServiceCall) -> None:
-        for entity in _target_entities(hass, call):
-            await entity.async_set_refresh_interval(int(call.data[ATTR_SECONDS]))
-
-    services = (
-        (SERVICE_NEXT_IMAGE, handle_next_image, SERVICE_ENTITY_SCHEMA),
-        (SERVICE_SET_SHUFFLE_MODE, handle_set_shuffle_mode, SERVICE_ENABLED_SCHEMA),
-        (SERVICE_SET_RANDOM_SPEED, handle_set_random_speed, SERVICE_ENABLED_SCHEMA),
-        (
-            SERVICE_SET_REFRESH_INTERVAL,
-            handle_set_refresh_interval,
-            SERVICE_INTERVAL_SCHEMA,
-        ),
-    )
-    for name, handler, schema in services:
-        if not hass.services.has_service(DOMAIN, name):
-            hass.services.async_register(DOMAIN, name, handler, schema=schema)
-
-    return True
-
-
-async def async_setup_entry(
-    hass: HomeAssistant, entry: ImmichConfigEntry
-) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: ImmichConfigEntry) -> bool:
     """Stel ImmichHomeAssistant in vanuit een config entry."""
     hub = ImmichHomeAssistantHub(
         hass=hass,
@@ -108,22 +46,71 @@ async def async_setup_entry(
 
     try:
         await hub.authenticate()
+        sources = await _async_build_sources(hub, entry)
     except InvalidAuth as error:
         raise ConfigEntryAuthFailed("De Immich API-sleutel is ongeldig") from error
-    except CannotConnect as error:
+    except (CannotConnect, ApiError) as error:
         raise ConfigEntryNotReady(str(error)) from error
 
-    entry.runtime_data = hub
-    hass.data.setdefault(ENTITY_STORE, {})[entry.entry_id] = []
+    entry.runtime_data = ImmichRuntimeData(
+        hub=hub,
+        sources=sources,
+        device_info=build_device_info(entry, hub.host),
+    )
+    _async_remove_stale_entities(hass, entry, sources)
+
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
 
-async def async_unload_entry(
-    hass: HomeAssistant, entry: ImmichConfigEntry
-) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: ImmichConfigEntry) -> bool:
     """Verwijder een config entry en alle gekoppelde entities."""
-    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-    if unload_ok:
-        hass.data.get(ENTITY_STORE, {}).pop(entry.entry_id, None)
-    return unload_ok
+    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+
+
+async def _async_build_sources(
+    hub: ImmichHomeAssistantHub, entry: ImmichConfigEntry
+) -> list[ImageSource]:
+    sources = [ImageSource(SourceKind.FAVORITES)]
+
+    if entry.options.get(CONF_ON_THIS_DAY, DEFAULT_ON_THIS_DAY):
+        sources.append(ImageSource(SourceKind.ON_THIS_DAY))
+
+    watched_album_ids = entry.options.get(CONF_WATCHED_ALBUMS, [])
+    if watched_album_ids:
+        album_map = {
+            album["id"]: album["albumName"]
+            for album in await hub.list_all_albums()
+            if album.get("id") and album.get("albumName")
+        }
+        for album_id in watched_album_ids:
+            if album_name := album_map.get(album_id):
+                sources.append(ImageSource(SourceKind.ALBUM, album_id, album_name))
+            else:
+                _LOGGER.warning(
+                    "Gekozen Immich-album %s bestaat niet meer en wordt overgeslagen",
+                    album_id,
+                )
+
+    return sources
+
+
+def _async_remove_stale_entities(
+    hass: HomeAssistant, entry: ImmichConfigEntry, sources: list[ImageSource]
+) -> None:
+    """Ruim entities op van albums die niet meer gevolgd worden."""
+    expected = {UID_SHUFFLE_MODE, UID_RANDOM_SPEED, UID_REFRESH_INTERVAL}
+    for source in sources:
+        expected.update(
+            {
+                source.unique_id,
+                original_unique_id(source.unique_id),
+                next_button_unique_id(source.unique_id),
+            }
+        )
+
+    registry = er.async_get(hass)
+    for registry_entry in er.async_entries_for_config_entry(registry, entry.entry_id):
+        if registry_entry.unique_id not in expected:
+            _LOGGER.debug("Verouderde entity %s verwijderd", registry_entry.entity_id)
+            registry.async_remove(registry_entry.entity_id)

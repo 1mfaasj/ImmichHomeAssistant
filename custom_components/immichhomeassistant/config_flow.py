@@ -6,9 +6,9 @@ from urllib.parse import urlparse
 
 import voluptuous as vol
 from homeassistant import config_entries
+from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.const import CONF_API_KEY, CONF_HOST
 from homeassistant.core import callback
-from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.selector import (
     BooleanSelector,
@@ -22,12 +22,14 @@ from url_normalize import url_normalize
 
 from .const import (
     CONF_NO_REPEAT_WINDOW,
+    CONF_ON_THIS_DAY,
     CONF_RANDOM_SPEED,
     CONF_REFRESH_INTERVAL,
     CONF_SHUFFLE_MODE,
     CONF_TAG_FILTER,
     CONF_WATCHED_ALBUMS,
     DEFAULT_NO_REPEAT_WINDOW,
+    DEFAULT_ON_THIS_DAY,
     DEFAULT_RANDOM_SPEED,
     DEFAULT_REFRESH_INTERVAL,
     DEFAULT_SHUFFLE_MODE,
@@ -38,7 +40,7 @@ from .const import (
     MIN_NO_REPEAT_WINDOW,
     MIN_REFRESH_INTERVAL,
 )
-from .hub import CannotConnect, ImmichHomeAssistantHub, InvalidAuth
+from .hub import ApiError, CannotConnect, ImmichHomeAssistantHub, InvalidAuth
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -73,7 +75,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
             try:
@@ -82,7 +84,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors["base"] = "cannot_connect"
             except InvalidAuth:
                 errors["base"] = "invalid_auth"
-            except Exception:
+            except Exception:  # noqa: BLE001
                 _LOGGER.exception("Onverwachte fout tijdens configuratie")
                 errors["base"] = "unknown"
             else:
@@ -100,19 +102,17 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_reauth(
         self, entry_data: dict[str, Any]
-    ) -> FlowResult:
-        self._reauth_entry = self.hass.config_entries.async_get_entry(
-            self.context["entry_id"]
-        )
+    ) -> ConfigFlowResult:
         return await self.async_step_reauth_confirm()
 
     async def async_step_reauth_confirm(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         errors: dict[str, str] = {}
-        if user_input is not None and self._reauth_entry is not None:
+        if user_input is not None:
+            reauth_entry = self._get_reauth_entry()
             data = {
-                CONF_HOST: self._reauth_entry.data[CONF_HOST],
+                CONF_HOST: reauth_entry.data[CONF_HOST],
                 CONF_API_KEY: user_input[CONF_API_KEY],
             }
             try:
@@ -121,12 +121,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors["base"] = "cannot_connect"
             except InvalidAuth:
                 errors["base"] = "invalid_auth"
-            except Exception:
+            except Exception:  # noqa: BLE001
                 _LOGGER.exception("Onverwachte fout tijdens herauthenticatie")
                 errors["base"] = "unknown"
             else:
                 return self.async_update_reload_and_abort(
-                    self._reauth_entry,
+                    reauth_entry,
                     data_updates={CONF_API_KEY: user_input[CONF_API_KEY]},
                 )
 
@@ -138,7 +138,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     @staticmethod
     @callback
-    def async_get_options_flow(config_entry):
+    def async_get_options_flow(
+        config_entry: config_entries.ConfigEntry,
+    ) -> OptionsFlowHandler:
         return OptionsFlowHandler()
 
 
@@ -147,12 +149,10 @@ class OptionsFlowHandler(config_entries.OptionsFlowWithReload):
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
 
-        errors: dict[str, str] = {}
-        album_map: dict[str, str] = {}
         try:
             hub = ImmichHomeAssistantHub(
                 self.hass,
@@ -160,19 +160,18 @@ class OptionsFlowHandler(config_entries.OptionsFlowWithReload):
                 self.config_entry.data[CONF_API_KEY],
             )
             albums = await hub.list_all_albums()
-            album_map = {
-                album["id"]: album["albumName"]
-                for album in albums
-                if album.get("id") and album.get("albumName")
-            }
-        except CannotConnect:
-            errors["base"] = "cannot_connect"
         except InvalidAuth:
-            errors["base"] = "invalid_auth"
-        except Exception:
-            _LOGGER.exception("Albums konden niet worden geladen")
-            errors["base"] = "unknown"
+            return self.async_abort(reason="invalid_auth")
+        except (CannotConnect, ApiError):
+            # Niet doorgaan met een lege albumlijst: opslaan zou de gekozen
+            # albums wissen.
+            return self.async_abort(reason="cannot_connect")
 
+        album_map = {
+            album["id"]: album["albumName"]
+            for album in albums
+            if album.get("id") and album.get("albumName")
+        }
         options = self.config_entry.options
         current = [
             album
@@ -185,6 +184,10 @@ class OptionsFlowHandler(config_entries.OptionsFlowWithReload):
                     album_map
                 ),
                 vol.Required(
+                    CONF_ON_THIS_DAY,
+                    default=options.get(CONF_ON_THIS_DAY, DEFAULT_ON_THIS_DAY),
+                ): BooleanSelector(),
+                vol.Required(
                     CONF_REFRESH_INTERVAL,
                     default=options.get(
                         CONF_REFRESH_INTERVAL, DEFAULT_REFRESH_INTERVAL
@@ -195,6 +198,7 @@ class OptionsFlowHandler(config_entries.OptionsFlowWithReload):
                         max=MAX_REFRESH_INTERVAL,
                         step=1,
                         mode=NumberSelectorMode.BOX,
+                        unit_of_measurement="s",
                     )
                 ),
                 vol.Required(
@@ -224,6 +228,4 @@ class OptionsFlowHandler(config_entries.OptionsFlowWithReload):
                 ): BooleanSelector(),
             }
         )
-        return self.async_show_form(
-            step_id="init", data_schema=schema, errors=errors
-        )
+        return self.async_show_form(step_id="init", data_schema=schema)

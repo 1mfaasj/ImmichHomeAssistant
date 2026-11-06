@@ -3,41 +3,137 @@
   "config": {
     "step": {
       "user": {
-        "title": "Verbinden met Immich",
+        "title": "Connect to Immich",
         "data": {
-          "host": "Immich-adres",
-          "api_key": "API-sleutel"
+          "host": "Immich URL",
+          "api_key": "API key"
+        },
+        "data_description": {
+          "host": "For example http://192.168.1.10:2283",
+          "api_key": "Create an API key in Immich under Account settings → API keys."
         }
       },
       "reauth_confirm": {
-        "title": "Opnieuw aanmelden bij Immich",
-        "description": "Voer een geldige API-sleutel in.",
+        "title": "Re-authenticate with Immich",
+        "description": "Enter a valid API key.",
         "data": {
-          "api_key": "API-sleutel"
+          "api_key": "API key"
         }
       }
     },
     "error": {
-      "cannot_connect": "Kan geen verbinding maken met Immich",
-      "invalid_auth": "De API-sleutel is ongeldig",
-      "unknown": "Onverwachte fout"
+      "cannot_connect": "Failed to connect to Immich",
+      "invalid_auth": "The API key is invalid",
+      "unknown": "Unexpected error"
     },
     "abort": {
-      "already_configured": "Deze Immich-server is al geconfigureerd",
-      "reauth_successful": "De API-sleutel is bijgewerkt"
+      "already_configured": "This Immich server is already configured",
+      "single_instance_allowed": "Only one Immich server can be configured.",
+      "reauth_successful": "The API key has been updated"
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "Immich-instellingen",
+        "title": "Immich settings",
         "data": {
-          "watched_albums": "Albums waarvoor entities worden gemaakt",
-          "refresh_interval": "Verversingsinterval in seconden",
-          "no_repeat_window": "Aantal recente afbeeldingen dat niet wordt herhaald",
-          "tag_filter": "Tagfilter, kommagescheiden",
-          "shuffle_mode": "Shufflemodus",
-          "random_speed": "Willekeurige diavoorstellingssnelheid"
+          "watched_albums": "Albums to create entities for",
+          "on_this_day": "'On this day' image",
+          "refresh_interval": "Refresh interval in seconds",
+          "no_repeat_window": "Number of recent images that are not repeated",
+          "tag_filter": "Tag filter, comma separated",
+          "shuffle_mode": "Shuffle mode",
+          "random_speed": "Random slideshow speed"
+        },
+        "data_description": {
+          "tag_filter": "Only show images with at least one of these tags. Does not apply to 'On this day'.",
+          "on_this_day": "Show photos from Immich's 'On this day' memories."
+        }
+      }
+    },
+    "abort": {
+      "cannot_connect": "Could not load the albums from Immich. Try again later; your current settings were not changed.",
+      "invalid_auth": "The API key is invalid"
+    }
+  },
+  "entity": {
+    "image": {
+      "favorites": {
+        "name": "Favorites"
+      },
+      "favorites_original": {
+        "name": "Favorites original"
+      },
+      "album": {
+        "name": "{album}"
+      },
+      "album_original": {
+        "name": "{album} original"
+      },
+      "on_this_day": {
+        "name": "On this day"
+      },
+      "on_this_day_original": {
+        "name": "On this day original"
+      }
+    },
+    "button": {
+      "next_favorites": {
+        "name": "Favorites next image"
+      },
+      "next_on_this_day": {
+        "name": "On this day next image"
+      },
+      "next_album": {
+        "name": "{album} next image"
+      }
+    },
+    "switch": {
+      "shuffle_mode": {
+        "name": "Shuffle mode"
+      },
+      "random_speed": {
+        "name": "Random slideshow speed"
+      }
+    },
+    "number": {
+      "refresh_interval": {
+        "name": "Refresh interval"
+      }
+    }
+  },
+  "services": {
+    "next_image": {
+      "name": "Next image",
+      "description": "Switch to the next image immediately."
+    },
+    "set_shuffle_mode": {
+      "name": "Set shuffle mode",
+      "description": "Temporarily turn shuffle mode on or off for the selected images.",
+      "fields": {
+        "enabled": {
+          "name": "Enabled",
+          "description": "Whether the setting should be on."
+        }
+      }
+    },
+    "set_random_speed": {
+      "name": "Set random speed",
+      "description": "Temporarily vary the refresh interval between 50 and 150 percent.",
+      "fields": {
+        "enabled": {
+          "name": "Enabled",
+          "description": "Whether the setting should be on."
+        }
+      }
+    },
+    "set_refresh_interval": {
+      "name": "Set refresh interval",
+      "description": "Temporarily change the refresh interval for the selected images.",
+      "fields": {
+        "seconds": {
+          "name": "Seconds",
+          "description": "New refresh interval in seconds."
         }
       }
     }

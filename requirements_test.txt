@@ -1,0 +1,2 @@
+pytest-homeassistant-custom-component
+url-normalize==1.4.3
