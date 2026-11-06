@@ -189,7 +189,7 @@ class ImmichHomeAssistantHub:
             "api/memories",
             params={
                 "type": "on_this_day",
-                "for": now.isoformat(),
+                "for": now.date().isoformat(),
                 "isTrashed": "false",
             },
         )

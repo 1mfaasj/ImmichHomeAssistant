@@ -112,3 +112,5 @@ async def test_on_this_day_filters_current_memories(
     assets = await hub.list_on_this_day_images(now)
 
     assert [a["id"] for a in assets] == ["today", "legacy"]
+    # Immich accepteert alleen een datum (YYYY-MM-DD), geen tijdstempel.
+    assert aioclient_mock.mock_calls[0][1].query["for"] == "2026-11-06"
