@@ -11,6 +11,7 @@ from .const import (
     DOMAIN,
     UID_FAVORITES,
     album_unique_id,
+    years_ago_unique_id,
 )
 
 if TYPE_CHECKING:
@@ -21,21 +22,26 @@ if TYPE_CHECKING:
 class SourceKind(StrEnum):
     FAVORITES = "favorites"
     ALBUM = "album"
+    YEARS_AGO = "years_ago"
 
 
 @dataclass(frozen=True, slots=True)
 class ImageSource:
-    """Beschrijving van een fotobron (favorieten of album)."""
+    """Beschrijving van een fotobron (favorieten, album of 'n jaar geleden')."""
 
     kind: SourceKind
     album_id: str | None = None
     album_name: str | None = None
+    years: int | None = None
 
     @property
     def unique_id(self) -> str:
         if self.kind is SourceKind.ALBUM:
             assert self.album_id is not None
             return album_unique_id(self.album_id)
+        if self.kind is SourceKind.YEARS_AGO:
+            assert self.years is not None
+            return years_ago_unique_id(self.years)
         return UID_FAVORITES
 
 

@@ -5,7 +5,7 @@ import logging
 import random
 import secrets
 from collections import deque
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 import voluptuous as vol
@@ -15,6 +15,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_platform
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.event import async_call_later
+from homeassistant.util import dt as dt_util
 
 from .const import (
     CONF_NO_REPEAT_WINDOW,
@@ -22,15 +23,18 @@ from .const import (
     CONF_REFRESH_INTERVAL,
     CONF_SHUFFLE_MODE,
     CONF_TAG_FILTER,
+    CONF_YEARS_AGO_MARGIN,
     DEFAULT_NO_REPEAT_WINDOW,
     DEFAULT_RANDOM_SPEED,
     DEFAULT_REFRESH_INTERVAL,
     DEFAULT_SHUFFLE_MODE,
     DEFAULT_TAG_FILTER,
+    DEFAULT_YEARS_AGO_MARGIN,
     DOMAIN,
     ID_LIST_REFRESH_INTERVAL_SECONDS,
     MAX_REFRESH_INTERVAL,
     MIN_REFRESH_INTERVAL,
+    YEARS_AGO_LIST_REFRESH_SECONDS,
     original_unique_id,
 )
 from .hub import (
@@ -101,6 +105,8 @@ def _create_source_entity(
 ) -> BaseImmichHomeAssistantImage:
     if source.kind is SourceKind.ALBUM:
         return ImmichHomeAssistantAlbumImage(hass, entry, source)
+    if source.kind is SourceKind.YEARS_AGO:
+        return ImmichYearsAgoImage(hass, entry, source)
     return ImmichHomeAssistantFavoriteImage(hass, entry, source)
 
 
@@ -108,6 +114,61 @@ def parse_tag_filter(value: str | None) -> set[str]:
     if not value:
         return set()
     return {item.strip().casefold() for item in value.split(",") if item.strip()}
+
+
+LIST_RETRY_SECONDS = 15 * 60
+
+
+def dedupe_assets(assets: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Unieke foto's: zelfde id of zelfde inhoud (checksum, bijv. 'foto (0).jpg')."""
+    seen_ids: set[str] = set()
+    seen_checksums: set[str] = set()
+    result = []
+    for asset in assets:
+        asset_id = asset.get("id")
+        checksum = asset.get("checksum")
+        if not asset_id or asset_id in seen_ids or (checksum and checksum in seen_checksums):
+            continue
+        seen_ids.add(asset_id)
+        if checksum:
+            seen_checksums.add(checksum)
+        result.append(asset)
+    return result
+
+
+def local_day(asset: dict[str, Any]) -> date | None:
+    """Lokale opnamedatum (Immich 'localDateTime' is de klok ter plaatse)."""
+    raw = asset.get("localDateTime") or asset.get("fileCreatedAt")
+    if not raw:
+        return None
+    try:
+        return date.fromisoformat(str(raw)[:10])
+    except ValueError:
+        return None
+
+
+def same_day_years_ago(today: date, years: int) -> date:
+    """Zelfde kalenderdag 'years' jaar terug; 29 februari wordt 28 februari."""
+    try:
+        return today.replace(year=today.year - years)
+    except ValueError:
+        return today.replace(year=today.year - years, day=28)
+
+
+def pick_closest_day(
+    assets: list[dict[str, Any]], target: date, margin_days: int
+) -> tuple[date | None, list[dict[str, Any]]]:
+    """Foto's van de doeldag, of anders van de dichtstbijzijnde dag binnen de marge
+    (bij gelijke afstand de dag ervóór)."""
+    by_day: dict[date, list[dict[str, Any]]] = {}
+    for asset in assets:
+        day = local_day(asset)
+        if day is not None and abs((day - target).days) <= margin_days:
+            by_day.setdefault(day, []).append(asset)
+    if not by_day:
+        return None, []
+    best = min(by_day, key=lambda d: (abs((d - target).days), d > target))
+    return best, by_day[best]
 
 
 def asset_metadata(asset: dict[str, Any] | None) -> dict[str, Any]:
@@ -304,14 +365,22 @@ class BaseImmichHomeAssistantImage(ImageEntity):
         if not force and not self._asset_list_expired(now):
             return
 
-        assets = await self._async_get_asset_list()
-        seen: set[str] = set()
-        self._asset_list = []
-        for asset in assets:
-            asset_id = asset.get("id")
-            if asset_id and asset_id not in seen:
-                seen.add(asset_id)
-                self._asset_list.append(asset)
+        try:
+            assets = await self._async_get_asset_list()
+        except (CannotConnect, ApiError) as error:
+            if not self._asset_list:
+                raise
+            # Met de vorige lijst verder wisselen; over een kwartier opnieuw proberen.
+            _LOGGER.warning(
+                "Fotolijst van %s niet ververst, de vorige wordt gebruikt: %s",
+                self.entity_id,
+                error,
+            )
+            self._last_asset_list_refresh = now - timedelta(
+                seconds=max(0, self._asset_list_ttl - LIST_RETRY_SECONDS)
+            )
+            return
+        self._asset_list = dedupe_assets(assets)
         self._shuffle_queue.clear()
         self._last_asset_list_refresh = now
 
@@ -654,15 +723,11 @@ class ImmichHomeAssistantAlbumImage(BaseImmichHomeAssistantImage):
     async def _async_fetch_tagged_assets(
         self, tag_ids: list[str]
     ) -> list[dict[str, Any]]:
-        tagged_ids: set[str] = set()
+        # Eén zoekopdracht per tag binnen het album (ten minste één van de tags).
+        assets: list[dict[str, Any]] = []
         for tag_id in tag_ids:
-            tagged_ids.update(
-                asset["id"]
-                for asset in await self.hub.list_tagged_images(tag_id)
-                if asset.get("id")
-            )
-        album_assets = await self.hub.list_album_images(self.album_id)
-        return [asset for asset in album_assets if asset.get("id") in tagged_ids]
+            assets.extend(await self.hub.list_album_images(self.album_id, tag_id=tag_id))
+        return assets
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -670,4 +735,65 @@ class ImmichHomeAssistantAlbumImage(BaseImmichHomeAssistantImage):
             **super().extra_state_attributes,
             "album_id": self.album_id,
             "album_name": self.album_name,
+        }
+
+
+class ImmichYearsAgoImage(BaseImmichHomeAssistantImage):
+    """Foto van vandaag precies n jaar geleden (lokale opnamedatum).
+
+    Zijn er die dag geen foto's, dan de dichtstbijzijnde dag binnen de marge.
+    De lijst wordt na middernacht en elke paar uur (nieuwe uploads) opnieuw
+    opgehaald.
+    """
+
+    _attr_translation_key = "years_ago"
+    _supports_tag_filter = False
+    _asset_list_ttl = YEARS_AGO_LIST_REFRESH_SECONDS
+
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        config_entry: ImmichConfigEntry,
+        source: ImageSource,
+    ) -> None:
+        super().__init__(hass, config_entry, source)
+        assert source.years is not None
+        self.years = source.years
+        self._attr_translation_placeholders = {"years": str(self.years)}
+        self._margin_days = int(
+            config_entry.options.get(CONF_YEARS_AGO_MARGIN, DEFAULT_YEARS_AGO_MARGIN)
+        )
+        self._list_for_day: date | None = None
+        self._target_day: date | None = None
+        self._shown_day: date | None = None
+
+    def _asset_list_expired(self, now: datetime) -> bool:
+        return self._list_for_day != dt_util.now().date() or super()._asset_list_expired(now)
+
+    async def _async_fetch_assets(self) -> list[dict[str, Any]]:
+        today = dt_util.now().date()
+        target = same_day_years_ago(today, self.years)
+        # ruim zoeken (UTC-venster), daarna op de lokale opnamedatum filteren
+        start = dt_util.start_of_local_day(target - timedelta(days=self._margin_days + 1))
+        end = dt_util.start_of_local_day(target + timedelta(days=self._margin_days + 2))
+        assets = await self.hub.list_images_taken_between(start, end)
+        shown, day_assets = pick_closest_day(assets, target, self._margin_days)
+        self._list_for_day = today
+        self._target_day = target
+        self._shown_day = shown
+        return day_assets
+
+    async def _async_refresh_locked(self, force_asset_list: bool) -> None:
+        # Na middernacht meteen een foto van de nieuwe dag, niet pas na de lijst-TTL.
+        await super()._async_refresh_locked(force_asset_list)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return {
+            **super().extra_state_attributes,
+            "years_ago": self.years,
+            "target_date": self._target_day,
+            "shown_date": self._shown_day,
+            "exact_day": self._shown_day is not None and self._shown_day == self._target_day,
+            "margin_days": self._margin_days,
         }

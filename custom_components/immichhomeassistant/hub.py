@@ -11,7 +11,13 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .const import MAX_SEARCH_PAGES, REQUEST_TIMEOUT_SECONDS, SEARCH_PAGE_SIZE
+from .const import (
+    MAX_SEARCH_PAGES,
+    REQUEST_RETRIES,
+    REQUEST_TIMEOUT_SECONDS,
+    RETRY_DELAY_SECONDS,
+    SEARCH_PAGE_SIZE,
+)
 
 _LOGGER = logging.getLogger(__name__)
 _HEADER_API_KEY = "x-api-key"
@@ -52,9 +58,29 @@ class ImmichHomeAssistantHub:
             raise InvalidAuth("Immich heeft de API-sleutel geweigerd")
         if response.status < 200 or response.status >= 300:
             body = (await response.text())[:500]
-            raise ApiError(f"Immich HTTP {response.status}: {body}")
+            raise ApiError(f"Immich HTTP {response.status}: {body}", response.status)
 
     async def _request_json(
+        self,
+        method: str,
+        path: str,
+        *,
+        json: dict[str, Any] | None = None,
+        params: dict[str, str] | None = None,
+    ) -> Any:
+        """JSON-verzoek; bij een tijdelijke storing (time-out, verbinding, 5xx)
+        nog één keer proberen. Alle gebruikte verzoeken zijn idempotent."""
+        for attempt in range(1 + REQUEST_RETRIES):
+            try:
+                return await self._request_json_once(method, path, json=json, params=params)
+            except (CannotConnect, ApiError) as error:
+                if attempt >= REQUEST_RETRIES or not _is_transient(error):
+                    raise
+                _LOGGER.debug("Tijdelijke fout bij %s, opnieuw: %s", path, error)
+                await asyncio.sleep(RETRY_DELAY_SECONDS)
+        raise AssertionError("onbereikbaar")
+
+    async def _request_json_once(
         self,
         method: str,
         path: str,
@@ -168,16 +194,29 @@ class ImmichHomeAssistantHub:
             raise ApiError("Onverwachte albumresponse")
         return [album for album in result if isinstance(album, dict)]
 
-    async def list_album_images(self, album_id: str) -> list[dict[str, Any]]:
-        result = await self._request_json("GET", f"api/albums/{album_id}")
-        if not isinstance(result, dict):
-            raise ApiError("Onverwachte albumresponse")
-        items = result.get("assets", [])
-        return [
-            item
-            for item in items
-            if isinstance(item, dict) and item.get("type") == "IMAGE"
-        ]
+    async def list_album_images(
+        self, album_id: str, *, tag_id: str | None = None
+    ) -> list[dict[str, Any]]:
+        """Foto's van een album (optioneel alleen met één tag).
+
+        Sinds Immich 3 geeft GET /api/albums/{id} geen assets meer terug; zoeken
+        met albumIds wel (en dan meteen met EXIF en personen).
+        """
+        filters: dict[str, Any] = {"albumIds": [album_id]}
+        if tag_id:
+            filters["tagIds"] = [tag_id]
+        return await self.search_images(filters)
+
+    async def list_images_taken_between(
+        self, after: datetime, before: datetime
+    ) -> list[dict[str, Any]]:
+        """Foto's met een opnametijd in [after, before)."""
+        return await self.search_images(
+            {
+                "takenAfter": after.astimezone(UTC).isoformat(),
+                "takenBefore": before.astimezone(UTC).isoformat(),
+            }
+        )
 
     # --------------------------------------------------------------- download
 
@@ -240,3 +279,14 @@ class InvalidAuth(HomeAssistantError):
 
 class ApiError(HomeAssistantError):
     """Immich gaf een ongeldige of onverwachte response terug."""
+
+    def __init__(self, message: str, status: int | None = None) -> None:
+        super().__init__(message)
+        self.status = status
+
+
+def _is_transient(error: Exception) -> bool:
+    """Time-outs, verbindingsfouten en 5xx zijn het opnieuw proberen waard."""
+    if isinstance(error, CannotConnect):
+        return True
+    return isinstance(error, ApiError) and error.status is not None and error.status >= 500

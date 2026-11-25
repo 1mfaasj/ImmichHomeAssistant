@@ -8,15 +8,26 @@ CONF_NO_REPEAT_WINDOW = "no_repeat_window"
 CONF_TAG_FILTER = "tag_filter"
 CONF_SHUFFLE_MODE = "shuffle_mode"
 CONF_RANDOM_SPEED = "random_speed"
+CONF_YEARS_AGO = "years_ago"
+CONF_YEARS_AGO_MARGIN = "years_ago_margin_days"
 
 DEFAULT_REFRESH_INTERVAL = 300
 DEFAULT_NO_REPEAT_WINDOW = 10
 DEFAULT_TAG_FILTER = ""
 DEFAULT_SHUFFLE_MODE = False
 DEFAULT_RANDOM_SPEED = False
+DEFAULT_YEARS_AGO = ["1", "2", "3"]
+DEFAULT_YEARS_AGO_MARGIN = 3
+
+YEARS_AGO_CHOICES = [str(n) for n in range(1, 21)]
+MAX_YEARS_AGO_MARGIN = 30
+# Terugblik: lijst van die dag opnieuw ophalen (nieuwe uploads), en sowieso bij een nieuwe dag
+YEARS_AGO_LIST_REFRESH_SECONDS = 3 * 60 * 60
 
 ID_LIST_REFRESH_INTERVAL_SECONDS = 12 * 60 * 60
 REQUEST_TIMEOUT_SECONDS = 30
+REQUEST_RETRIES = 1
+RETRY_DELAY_SECONDS = 2
 MIN_REFRESH_INTERVAL = 10
 MAX_REFRESH_INTERVAL = 3600
 MIN_NO_REPEAT_WINDOW = 0
@@ -32,6 +43,10 @@ UID_FAVORITES = f"{UID_PREFIX}_favorite_image"
 UID_SHUFFLE_MODE = f"{UID_PREFIX}_shuffle_mode"
 UID_RANDOM_SPEED = f"{UID_PREFIX}_random_speed"
 UID_REFRESH_INTERVAL = f"{UID_PREFIX}_refresh_interval"
+
+
+def years_ago_unique_id(years: int) -> str:
+    return f"{UID_PREFIX}_years_ago_{years}"
 
 
 def album_unique_id(album_id: str) -> str:
