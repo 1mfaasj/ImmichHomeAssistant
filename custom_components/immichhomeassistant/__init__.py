@@ -9,6 +9,8 @@ from homeassistant.helpers import entity_registry as er
 
 from .const import (
     CONF_WATCHED_ALBUMS,
+    CONF_YEARS_AGO,
+    DEFAULT_YEARS_AGO,
     UID_RANDOM_SPEED,
     UID_REFRESH_INTERVAL,
     UID_SHUFFLE_MODE,
@@ -70,6 +72,12 @@ async def _async_build_sources(
     hub: ImmichHomeAssistantHub, entry: ImmichConfigEntry
 ) -> list[ImageSource]:
     sources = [ImageSource(SourceKind.FAVORITES)]
+    sources.extend(
+        ImageSource(SourceKind.YEARS_AGO, years=years)
+        for years in sorted(
+            {int(y) for y in entry.options.get(CONF_YEARS_AGO, DEFAULT_YEARS_AGO)}
+        )
+    )
 
     watched_album_ids = entry.options.get(CONF_WATCHED_ALBUMS, [])
     if watched_album_ids:

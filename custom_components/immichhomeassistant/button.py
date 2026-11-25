@@ -11,6 +11,7 @@ from .models import ImageSource, ImmichConfigEntry, SourceKind
 _TRANSLATION_KEYS = {
     SourceKind.FAVORITES: "next_favorites",
     SourceKind.ALBUM: "next_album",
+    SourceKind.YEARS_AGO: "next_years_ago",
 }
 
 
@@ -41,6 +42,8 @@ class ImmichNextImageButton(ButtonEntity):
             self._attr_translation_placeholders = {
                 "album": source.album_name or source.album_id or ""
             }
+        elif source.kind is SourceKind.YEARS_AGO:
+            self._attr_translation_placeholders = {"years": str(source.years)}
 
     async def async_press(self) -> None:
         entity = self._entry.runtime_data.entities.get(self._source.unique_id)

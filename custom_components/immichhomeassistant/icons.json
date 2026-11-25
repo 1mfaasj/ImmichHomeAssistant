@@ -12,6 +12,12 @@
       },
       "album_original": {
         "default": "mdi:image-album"
+      },
+      "years_ago": {
+        "default": "mdi:calendar-clock"
+      },
+      "years_ago_original": {
+        "default": "mdi:calendar-clock"
       }
     },
     "button": {
@@ -19,6 +25,9 @@
         "default": "mdi:skip-next"
       },
       "next_album": {
+        "default": "mdi:skip-next"
+      },
+      "next_years_ago": {
         "default": "mdi:skip-next"
       }
     },

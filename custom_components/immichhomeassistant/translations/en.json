@@ -42,10 +42,14 @@
           "no_repeat_window": "Number of recent images that are not repeated",
           "tag_filter": "Tag filter, comma separated",
           "shuffle_mode": "Shuffle mode",
-          "random_speed": "Random slideshow speed"
+          "random_speed": "Random slideshow speed",
+          "years_ago": "Look back: photo from this day … years ago",
+          "years_ago_margin_days": "Look back: margin in days"
         },
         "data_description": {
-          "tag_filter": "Only show images with at least one of these tags."
+          "tag_filter": "Only show images with at least one of these tags.",
+          "years_ago": "An image entity is created for each selected number of years. Select none to disable.",
+          "years_ago_margin_days": "No photos on that exact day? Use the closest day within this many days (0 = exact day only)."
         }
       }
     },
@@ -67,6 +71,12 @@
       },
       "album_original": {
         "name": "{album} original"
+      },
+      "years_ago": {
+        "name": "{years} years ago"
+      },
+      "years_ago_original": {
+        "name": "{years} years ago original"
       }
     },
     "button": {
@@ -75,6 +85,9 @@
       },
       "next_album": {
         "name": "{album} next image"
+      },
+      "next_years_ago": {
+        "name": "{years} years ago next image"
       }
     },
     "switch": {

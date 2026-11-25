@@ -5,6 +5,11 @@ A Home Assistant custom integration that shows rotating photos from your
 
 ## Features
 
+* **Look back**: an image entity with a photo taken on this day 1, 2, 3 …
+  years ago (choose the years in the options). If there is no photo on that
+  exact day, the closest day within a configurable margin is used (attributes
+  `target_date`, `shown_date`, `exact_day`). The day is matched on the local
+  capture date and the list is refreshed after midnight.
 * **Image entities** for favorites and every selected album.
   Each source also gets an *original* entity that loads the full-resolution
   photo only when you open it (HEIC/RAW photos are converted by Immich).
@@ -42,6 +47,12 @@ Only one Immich server can be configured.
 | Tag filter | Comma-separated tag names |
 | Shuffle mode | Show every photo once before repeating |
 | Random speed | Vary the interval between 50 % and 150 % |
+| Look back | Years for which a "this day n years ago" entity is created (default 1, 2, 3) |
+| Look back margin | Days around the date to search when that day has no photos (default 3, 0 = exact day only) |
+
+Duplicate photos (same checksum, e.g. `IMG_1.jpg` and `IMG_1(0).jpg`) are shown
+only once. Temporary errors (time-outs, HTTP 5xx) are retried once, and if a
+photo list cannot be refreshed the previous list keeps rotating.
 
 The `set_*` actions change a setting **temporarily** for the selected image
 entities. To change a setting permanently, use the switch/number entities or
@@ -56,6 +67,7 @@ Entity IDs depend on your Home Assistant language. With Dutch, for example:
 | `image.immich_favorieten` | Rotating favorite (preview size, ~1440 px) |
 | `image.immich_favorieten_origineel` | Full resolution of the current favorite |
 | `image.immich_<album>` | Rotating photo from an album |
+| `image.immich_1_jaar_geleden` | Photo from this day one year ago (also 2, 3 …) |
 | `button.immich_favorieten_volgende_foto` | Skip to the next favorite |
 | `switch.immich_shufflemodus` | Shuffle mode for all sources |
 | `number.immich_verversingsinterval` | Refresh interval for all sources |

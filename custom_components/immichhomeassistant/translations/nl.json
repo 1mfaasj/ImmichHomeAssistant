@@ -42,10 +42,14 @@
           "no_repeat_window": "Aantal recente afbeeldingen dat niet wordt herhaald",
           "tag_filter": "Tagfilter, kommagescheiden",
           "shuffle_mode": "Shufflemodus",
-          "random_speed": "Willekeurige diavoorstellingssnelheid"
+          "random_speed": "Willekeurige diavoorstellingssnelheid",
+          "years_ago": "Terugblik: foto van vandaag … jaar geleden",
+          "years_ago_margin_days": "Terugblik: marge in dagen"
         },
         "data_description": {
-          "tag_filter": "Toon alleen foto's met minstens één van deze tags."
+          "tag_filter": "Toon alleen foto's met minstens één van deze tags.",
+          "years_ago": "Voor elk gekozen aantal jaren komt er een foto-entity. Geen keuze = geen terugblik.",
+          "years_ago_margin_days": "Geen foto's op precies die dag? Dan de dichtstbijzijnde dag binnen zoveel dagen (0 = alleen precies die dag)."
         }
       }
     },
@@ -67,6 +71,12 @@
       },
       "album_original": {
         "name": "{album} Origineel"
+      },
+      "years_ago": {
+        "name": "{years} jaar geleden"
+      },
+      "years_ago_original": {
+        "name": "{years} jaar geleden origineel"
       }
     },
     "button": {
@@ -75,6 +85,9 @@
       },
       "next_album": {
         "name": "{album} volgende foto"
+      },
+      "next_years_ago": {
+        "name": "{years} jaar geleden volgende foto"
       }
     },
     "switch": {

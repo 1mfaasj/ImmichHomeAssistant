@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from unittest.mock import AsyncMock
 
 from homeassistant.const import ATTR_ENTITY_ID
@@ -15,10 +16,14 @@ from custom_components.immichhomeassistant.const import (
     CONF_TAG_FILTER,
     DOMAIN,
 )
+from custom_components.immichhomeassistant.hub import CannotConnect
 from custom_components.immichhomeassistant.image import (
     ImmichHomeAssistantFavoriteImage,
     asset_metadata,
+    dedupe_assets,
     parse_tag_filter,
+    pick_closest_day,
+    same_day_years_ago,
 )
 
 from .conftest import make_asset
@@ -149,14 +154,18 @@ async def test_tag_filter_uses_server_side_search(
         {"id": "t1", "name": "Strand", "value": "Vakantie/Strand"},
         {"id": "t2", "name": "Bergen", "value": "Bergen"},
     ]
-    mock_hub.list_tagged_images.return_value = [make_asset("alb-1"), make_asset("x")]
-    mock_hub.list_album_images.return_value = [make_asset("alb-1"), make_asset("alb-2")]
+    mock_hub.list_tagged_images.return_value = [make_asset("fav-1")]
+
+    async def album_images(album_id, *, tag_id=None):
+        return [make_asset("alb-1")] if tag_id == "t1" else [make_asset("alb-1"), make_asset("alb-2")]
+
+    mock_hub.list_album_images.side_effect = album_images
     await _setup(hass, config_entry)
 
     album = config_entry.runtime_data.entities["immichhomeassistant_album_album-1"]
     assert [a["id"] for a in album._asset_list] == ["alb-1"]
     mock_hub.list_tagged_images.assert_any_call("t1", favorites_only=True)
-    mock_hub.list_tagged_images.assert_any_call("t1")
+    mock_hub.list_album_images.assert_any_call("album-1", tag_id="t1")
     mock_hub.get_asset_info.assert_not_called()
 
 
@@ -217,3 +226,65 @@ def test_helpers() -> None:
     assert meta["description"] == "Hoi"
     assert meta["city"] is None
     assert asset_metadata(None)["photo_date"] is None
+
+
+def test_years_ago_helpers() -> None:
+    assert same_day_years_ago(date(2026, 11, 25), 3) == date(2023, 11, 25)
+    assert same_day_years_ago(date(2028, 2, 29), 1) == date(2027, 2, 28)
+
+    def a(i, local):
+        return {"id": i, "localDateTime": local + "T10:00:00.000Z"}
+
+    assets = [a("x", "2025-11-23"), a("y", "2025-11-27"), a("z", "2025-11-21")]
+    # geen foto op de dag zelf: dichtstbij, bij gelijke afstand de dag ervóór
+    day, items = pick_closest_day(assets, date(2025, 11, 25), 3)
+    assert day == date(2025, 11, 23) and [i["id"] for i in items] == ["x"]
+    assert pick_closest_day(assets, date(2025, 11, 25), 0) == (None, [])
+    day, items = pick_closest_day(assets + [a("t", "2025-11-25")], date(2025, 11, 25), 3)
+    assert day == date(2025, 11, 25) and [i["id"] for i in items] == ["t"]
+
+
+def test_dedupe_by_checksum() -> None:
+    assets = [
+        {"id": "a", "checksum": "c1"},
+        {"id": "b", "checksum": "c1"},  # zelfde foto, ander bestand
+        {"id": "a", "checksum": "c1"},
+        {"id": "c"},
+    ]
+    assert [x["id"] for x in dedupe_assets(assets)] == ["a", "c"]
+
+
+async def test_years_ago_entities(
+    hass: HomeAssistant, config_entry: MockConfigEntry, mock_hub: AsyncMock
+) -> None:
+    from homeassistant.util import dt as dt_util
+
+    today = dt_util.now().date()
+    target = same_day_years_ago(today, 2)
+
+    async def between(after, before):
+        return [
+            {**make_asset("ja2"), "localDateTime": f"{target.isoformat()}T09:00:00.000Z"},
+            {**make_asset("andere-dag"), "localDateTime": "1999-01-01T09:00:00.000Z"},
+        ]
+
+    mock_hub.list_images_taken_between.side_effect = between
+    await _setup(hass, config_entry)
+
+    state = hass.states.get(_entity_id(hass, "image", "immichhomeassistant_years_ago_2"))
+    assert state.state != "unavailable"
+    assert state.attributes["current_asset_id"] == "ja2"
+    assert state.attributes["exact_day"] is True
+    assert state.attributes["years_ago"] == 2
+    assert _entity_id(hass, "button", "immichhomeassistant_years_ago_2_next")
+
+
+async def test_list_failure_keeps_previous_list(
+    hass: HomeAssistant, config_entry: MockConfigEntry, mock_hub: AsyncMock
+) -> None:
+    await _setup(hass, config_entry)
+    fav = config_entry.runtime_data.entities["immichhomeassistant_favorite_image"]
+    assert len(fav._asset_list) == 2
+    mock_hub.list_favorite_images.side_effect = CannotConnect("weg")
+    await fav._ensure_asset_list(force=True)
+    assert len(fav._asset_list) == 2  # vorige lijst blijft

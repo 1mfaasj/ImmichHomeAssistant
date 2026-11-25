@@ -783,10 +783,6 @@ class ImmichYearsAgoImage(BaseImmichHomeAssistantImage):
         self._shown_day = shown
         return day_assets
 
-    async def _async_refresh_locked(self, force_asset_list: bool) -> None:
-        # Na middernacht meteen een foto van de nieuwe dag, niet pas na de lijst-TTL.
-        await super()._async_refresh_locked(force_asset_list)
-
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         return {

@@ -26,16 +26,22 @@ from .const import (
     CONF_SHUFFLE_MODE,
     CONF_TAG_FILTER,
     CONF_WATCHED_ALBUMS,
+    CONF_YEARS_AGO,
+    CONF_YEARS_AGO_MARGIN,
     DEFAULT_NO_REPEAT_WINDOW,
     DEFAULT_RANDOM_SPEED,
     DEFAULT_REFRESH_INTERVAL,
     DEFAULT_SHUFFLE_MODE,
     DEFAULT_TAG_FILTER,
+    DEFAULT_YEARS_AGO,
+    DEFAULT_YEARS_AGO_MARGIN,
     DOMAIN,
     MAX_NO_REPEAT_WINDOW,
     MAX_REFRESH_INTERVAL,
+    MAX_YEARS_AGO_MARGIN,
     MIN_NO_REPEAT_WINDOW,
     MIN_REFRESH_INTERVAL,
+    YEARS_AGO_CHOICES,
 )
 from .hub import ApiError, CannotConnect, ImmichHomeAssistantHub, InvalidAuth
 
@@ -95,7 +101,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors["base"] = "cannot_connect"
             except InvalidAuth:
                 errors["base"] = "invalid_auth"
-            except Exception:  # noqa: BLE001
+            except Exception:
                 _LOGGER.exception("Onverwachte fout tijdens configuratie")
                 errors["base"] = "unknown"
             else:
@@ -132,7 +138,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors["base"] = "cannot_connect"
             except InvalidAuth:
                 errors["base"] = "invalid_auth"
-            except Exception:  # noqa: BLE001
+            except Exception:
                 _LOGGER.exception("Onverwachte fout tijdens herauthenticatie")
                 errors["base"] = "unknown"
             else:
@@ -225,6 +231,27 @@ class OptionsFlowHandler(config_entries.OptionsFlowWithReload):
                     CONF_TAG_FILTER,
                     default=options.get(CONF_TAG_FILTER, DEFAULT_TAG_FILTER),
                 ): TextSelector(TextSelectorConfig()),
+                vol.Required(
+                    CONF_YEARS_AGO,
+                    default=[
+                        y
+                        for y in options.get(CONF_YEARS_AGO, DEFAULT_YEARS_AGO)
+                        if y in YEARS_AGO_CHOICES
+                    ],
+                ): cv.multi_select({y: y for y in YEARS_AGO_CHOICES}),
+                vol.Required(
+                    CONF_YEARS_AGO_MARGIN,
+                    default=options.get(
+                        CONF_YEARS_AGO_MARGIN, DEFAULT_YEARS_AGO_MARGIN
+                    ),
+                ): NumberSelector(
+                    NumberSelectorConfig(
+                        min=0,
+                        max=MAX_YEARS_AGO_MARGIN,
+                        step=1,
+                        mode=NumberSelectorMode.BOX,
+                    )
+                ),
                 vol.Required(
                     CONF_SHUFFLE_MODE,
                     default=options.get(CONF_SHUFFLE_MODE, DEFAULT_SHUFFLE_MODE),
